@@ -1,0 +1,27 @@
+{
+  "name": "anatomy-dev",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "packages": {
+        "$className": "Folder",
+        "roblox_packages": {
+          "$path": "roblox_packages"
+        },
+        "anatomy": {
+          "$path": "src"
+        }
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "anatomyDev": {
+          "$path": "dev/client"
+        }
+      }
+    }
+  }
+}
