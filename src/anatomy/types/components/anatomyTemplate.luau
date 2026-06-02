@@ -10,7 +10,6 @@ export type AnatomyId = DefTypes.AnatomyId
 export type AnatomyInstance = AnatomyInstanceTypes.AnatomyInstance
 export type AnatomyRole = DefTypes.AnatomyRole
 export type DescriptorMetadata = DefTypes.DescriptorMetadata
-export type MountSpec = DefTypes.MountSpec
 export type PartDescriptor = DefTypes.PartDescriptor
 export type PartName = DefTypes.PartName
 export type RecognizeConfig = DefTypes.RecognizeConfig
@@ -32,7 +31,6 @@ export type AnatomyTemplate = {
 	getSurfaceDescriptors: (self: AnatomyTemplate) -> { [SurfaceName]: SurfaceDescriptor },
 	getPartDescriptor: (self: AnatomyTemplate, name: PartName) -> PartDescriptor?,
 	getPartDescriptors: (self: AnatomyTemplate) -> { [PartName]: PartDescriptor },
-	getMountSpecs: (self: AnatomyTemplate) -> { MountSpec },
 
 	instantiate: (self: AnatomyTemplate, parent: Instance?) -> AnatomyInstance,
 	wrap: (self: AnatomyTemplate, root: Instance) -> AnatomyInstance,
@@ -49,7 +47,6 @@ export type AnatomyTemplateImpl = AnatomyTemplate & {
 	_socketDescriptors: { [SocketName]: SocketDescriptor },
 	_surfaceDescriptors: { [SurfaceName]: SurfaceDescriptor },
 	_partDescriptors: { [PartName]: PartDescriptor },
-	_mountSpecs: { MountSpec },
 }
 
 return {}

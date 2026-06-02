@@ -32,6 +32,12 @@ AnatomyHost.__index = AnatomyHost
 local AnatomyHostLayer = {}
 AnatomyHostLayer.__index = AnatomyHostLayer
 
+local function weakKeySet(): { [any]: true }
+	return setmetatable({}, {
+		__mode = "k",
+	}) :: any
+end
+
 local function sortLayers(layerOrder: { AnatomyHostLayerImpl })
 	table.sort(layerOrder, function(left, right)
 		if left._priority == right._priority then
@@ -58,6 +64,21 @@ local function collectSocketNames(self: AnatomyHostImpl): { [SocketName]: boolea
 	return names
 end
 
+local function makeSortedNameList(names: { [SocketName]: boolean }): { SocketName }
+	local count = 0
+	for _ in names do
+		count += 1
+	end
+
+	local nameList = table.create(count)
+	for name in names do
+		table.insert(nameList, name)
+	end
+
+	table.sort(nameList)
+	return nameList
+end
+
 local function copyQuery(query: AnatomyHostSocketQuery?): AnatomyHostSocketQuery?
 	if query == nil then
 		return nil
@@ -78,8 +99,8 @@ function AnatomyHost.new(options: AnatomyHostOptions?): AnatomyHost
 	self._resolvedSockets = {}
 	self._socketHooks = {}
 	self._socketQueryHooks = {}
-	self._bindings = {}
-	self._mounts = {}
+	self._bindings = weakKeySet() :: any
+	self._mounts = weakKeySet() :: any
 	self._nextLayerOrdinal = 1
 	self._nextSocketQueryBindId = 1
 	self._destroyed = false
@@ -181,6 +202,61 @@ end
 
 function AnatomyHost.getLayers(self: AnatomyHostImpl): { AnatomyHostLayer }
 	return table.clone(self._layerOrder) :: any
+end
+
+function AnatomyHost.getSocketNames(
+	self: AnatomyHostImpl,
+	query: AnatomyHostSocketQuery?
+): { SocketName }
+	local names: { [SocketName]: boolean } = {}
+
+	if query ~= nil and query.layerId ~= nil then
+		local layer = self._layers[query.layerId]
+		if layer == nil then
+			return {}
+		end
+
+		for name in layer._instance:getSockets() do
+			names[name] = true
+		end
+
+		return makeSortedNameList(names)
+	end
+
+	for name in collectSocketNames(self) do
+		if self:_resolveSocket(name, query) ~= nil then
+			names[name] = true
+		end
+	end
+
+	return makeSortedNameList(names)
+end
+
+function AnatomyHost.getSockets(
+	self: AnatomyHostImpl,
+	query: AnatomyHostSocketQuery?
+): { [SocketName]: AnatomySocket }
+	local sockets: { [SocketName]: AnatomySocket } = {}
+
+	if query ~= nil and query.layerId ~= nil then
+		local layer = self._layers[query.layerId]
+		if layer == nil then
+			return sockets
+		end
+
+		return layer._instance:getSockets()
+	end
+
+	for name in collectSocketNames(self) do
+		local socket = self:_resolveSocket(name, query)
+		if socket == nil then
+			continue
+		end
+
+		sockets[name] = socket
+	end
+
+	return sockets
 end
 
 function AnatomyHost.getSocket(
@@ -396,14 +472,6 @@ function AnatomyHost._normalizeEndpoint(
 	end
 
 	error("Invalid anatomy socket mount endpoint", 2)
-end
-
-function AnatomyHost._disconnectBinding(self: AnatomyHostImpl, binding: any): ()
-	self._bindings[binding] = nil
-end
-
-function AnatomyHost._disconnectMount(self: AnatomyHostImpl, mount: any): ()
-	self._mounts[mount] = nil
 end
 
 function AnatomyHost.deconstruct(self: AnatomyHostImpl): ()

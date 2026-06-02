@@ -38,7 +38,6 @@ export type AnatomyService = {
 }
 
 export type AnatomyServiceImpl = AnatomyService & {
-	_templatesBySource: { [Instance]: AnatomyTemplateTypes.AnatomyTemplateImpl },
 	_nextHostId: number,
 }
 

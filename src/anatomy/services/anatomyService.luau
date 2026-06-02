@@ -21,7 +21,6 @@ export type SocketMount = Types.SocketMount
 export type SocketMountOptions = Types.SocketMountOptions
 
 local AnatomyService: AnatomyServiceImpl = {
-	_templatesBySource = {},
 	_nextHostId = 1,
 } :: any
 
@@ -32,9 +31,7 @@ local function buildRecognizeConfig(role: "rig" | "addon", options: RecognizeOpt
 end
 
 function AnatomyService.recognize(root: Instance, config: RecognizeConfig): AnatomyTemplate
-	local template = AnatomyTemplate.recognize(root, config) :: any
-	AnatomyService._templatesBySource[root] = template
-	return template
+	return AnatomyTemplate.recognize(root, config) :: any
 end
 
 function AnatomyService.recognizeRig(root: Instance, options: RecognizeOptions): AnatomyTemplate

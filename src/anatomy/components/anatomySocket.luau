@@ -84,6 +84,8 @@ function AnatomySocket.unbindAttachmentChanged(self: AnatomySocketImpl, hookId: 
 	return self._attachmentChangedHook:remove(hookId)
 end
 
+-- Reserved for a future live-socket mode where resolved attachments can retarget
+-- inside one AnatomyInstance.
 function AnatomySocket._setAttachment(self: AnatomySocketImpl, attachment: Attachment?): ()
 	if self._attachment == attachment then
 		return

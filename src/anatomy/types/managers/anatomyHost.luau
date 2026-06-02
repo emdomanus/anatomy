@@ -84,6 +84,14 @@ export type AnatomyHost = {
 
 	getLayer: (self: AnatomyHost, layerId: LayerId) -> AnatomyHostLayer?,
 	getLayers: (self: AnatomyHost) -> { AnatomyHostLayer },
+	getSocketNames: (
+		self: AnatomyHost,
+		query: AnatomyHostSocketQuery?
+	) -> { SocketName },
+	getSockets: (
+		self: AnatomyHost,
+		query: AnatomyHostSocketQuery?
+	) -> { [SocketName]: AnatomySocket },
 	getSocket: (self: AnatomyHost, name: SocketName, query: AnatomyHostSocketQuery?) -> AnatomySocket?,
 	bindSocket: (
 		self: AnatomyHost,
@@ -132,8 +140,6 @@ export type AnatomyHostImpl = AnatomyHost & {
 		self: AnatomyHostImpl,
 		endpoint: AnatomyHostMountEndpoint
 	) -> SocketEndpoint,
-	_disconnectBinding: (self: AnatomyHostImpl, binding: SocketBindingTypes.SocketBindingImpl) -> (),
-	_disconnectMount: (self: AnatomyHostImpl, mount: SocketMountTypes.SocketMountImpl) -> (),
 }
 
 return {}

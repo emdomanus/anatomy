@@ -14,7 +14,6 @@ export type LayerId = string
 export type SocketName = string
 export type SurfaceName = string
 export type PartName = string
-export type MountName = string
 
 --------------------------------------------------------------------------------
 -- Paths
@@ -52,19 +51,6 @@ export type PartDescriptor = {
 	metadata: DescriptorMetadata?,
 }
 
-export type SocketAddress = {
-	socket: SocketName,
-	layerId: LayerId?,
-	includeOverrides: boolean?,
-}
-
-export type MountSpec = {
-	name: MountName?,
-	from: SocketAddress,
-	to: SocketAddress,
-	metadata: DescriptorMetadata?,
-}
-
 export type InstancePolicy = {
 	canCollide: boolean?,
 	canQuery: boolean?,
@@ -83,10 +69,6 @@ export type RecognizeOptions = {
 	socketAttribute: string?,
 	surfaceAttribute: string?,
 	partAttribute: string?,
-	mountNameAttribute: string?,
-	mountFromAttribute: string?,
-	mountToAttribute: string?,
-	socketOverrideAttribute: string?,
 
 	instancePolicy: InstancePolicy?,
 

@@ -26,7 +26,7 @@ under `ReplicatedStorage.packages`.
 ## Concepts
 
 - `AnatomyTemplate` is the recognized asset description. It stores relative paths
-  to sockets, parts, surfaces, and mount specs.
+  to sockets, parts, and surfaces.
 - `AnatomyInstance` is a live clone or wrapped model resolved against a template.
 - `AnatomyHost` layers one or more anatomy instances, usually a rig plus addons,
   and resolves sockets reactively.
@@ -37,6 +37,10 @@ under `ReplicatedStorage.packages`.
 Sockets are explicit Roblox `Attachment` instances with a configured socket
 attribute. Parts and surfaces can be marked with configured attributes on any
 instance. Duplicate socket names in one recognized asset are rejected.
+
+Sockets, parts, and surfaces are resolved when an `AnatomyInstance` is created.
+Anatomy reacts to host layer changes, but it does not watch a model's descendant
+tree for later additions, removals, or streaming changes inside the same instance.
 
 ## Example
 
@@ -92,6 +96,8 @@ print(weaponMount:isConnected())
 
 When the `weapon` layer is removed and another weapon layer is pushed with the
 same id, any mount or binding that targets that layer will retarget automatically.
+Preview and editor tooling can use `host:getSocketNames()` or `host:getSockets()`
+to inspect the currently resolved socket set.
 
 ## VFX And Preview Tools
 

@@ -13,7 +13,6 @@ export type AnatomyRole = Types.AnatomyRole
 export type AnatomyTemplate = Types.AnatomyTemplate
 export type AnatomyTemplateImpl = Types.AnatomyTemplateImpl
 export type DescriptorMetadata = Types.DescriptorMetadata
-export type MountSpec = Types.MountSpec
 export type PartDescriptor = Types.PartDescriptor
 export type PartName = Types.PartName
 export type RecognizeConfig = Types.RecognizeConfig
@@ -60,29 +59,14 @@ local function makeSearchList(root: Instance): { Instance }
 	return list
 end
 
-local function readMountAddress(instance: Instance, attributeName: string, descriptorKind: string): { socket: string }?
-	local socket = readNamedAttribute(instance, attributeName, descriptorKind)
-	if socket == nil then
-		return nil
-	end
-
-	return {
-		socket = socket,
-	}
-end
-
 function AnatomyTemplate.recognize(root: Instance, config: RecognizeConfig): AnatomyTemplate
 	local socketAttribute = getAttributeName(config, "socketAttribute")
 	local surfaceAttribute = getAttributeName(config, "surfaceAttribute")
 	local partAttribute = getAttributeName(config, "partAttribute")
-	local mountNameAttribute = getAttributeName(config, "mountNameAttribute")
-	local mountFromAttribute = getAttributeName(config, "mountFromAttribute")
-	local mountToAttribute = getAttributeName(config, "mountToAttribute")
 
 	local socketDescriptors: { [SocketName]: SocketDescriptor } = {}
 	local surfaceDescriptors: { [SurfaceName]: SurfaceDescriptor } = {}
 	local partDescriptors: { [PartName]: PartDescriptor } = {}
-	local mountSpecs: { MountSpec } = {}
 
 	for _, instance in makeSearchList(root) do
 		if socketAttribute ~= nil then
@@ -134,30 +118,9 @@ function AnatomyTemplate.recognize(root: Instance, config: RecognizeConfig): Ana
 				}
 			end
 		end
-
-		if mountFromAttribute ~= nil or mountToAttribute ~= nil then
-			local from = if mountFromAttribute ~= nil
-				then readMountAddress(instance, mountFromAttribute, "mount from")
-				else nil
-			local to = if mountToAttribute ~= nil then readMountAddress(instance, mountToAttribute, "mount to") else nil
-
-			if from ~= nil or to ~= nil then
-				if from == nil or to == nil then
-					error(`Anatomy mount spec on {instance:GetFullName()} must define both from and to`, 2)
-				end
-
-				table.insert(mountSpecs, {
-					name = if mountNameAttribute ~= nil
-						then readNamedAttribute(instance, mountNameAttribute, "mount name")
-						else nil,
-					from = from,
-					to = to,
-				})
-			end
-		end
 	end
 
-	return AnatomyTemplate.new(root, config, socketDescriptors, surfaceDescriptors, partDescriptors, mountSpecs)
+	return AnatomyTemplate.new(root, config, socketDescriptors, surfaceDescriptors, partDescriptors)
 end
 
 function AnatomyTemplate.new(
@@ -165,8 +128,7 @@ function AnatomyTemplate.new(
 	config: RecognizeConfig,
 	socketDescriptors: { [SocketName]: SocketDescriptor }?,
 	surfaceDescriptors: { [SurfaceName]: SurfaceDescriptor }?,
-	partDescriptors: { [PartName]: PartDescriptor }?,
-	mountSpecs: { MountSpec }?
+	partDescriptors: { [PartName]: PartDescriptor }?
 ): AnatomyTemplate
 	local self: AnatomyTemplateImpl = setmetatable({}, AnatomyTemplate) :: any
 
@@ -179,7 +141,6 @@ function AnatomyTemplate.new(
 	self._socketDescriptors = socketDescriptors or {}
 	self._surfaceDescriptors = surfaceDescriptors or {}
 	self._partDescriptors = partDescriptors or {}
-	self._mountSpecs = mountSpecs or {}
 
 	return self
 end
@@ -236,10 +197,6 @@ end
 
 function AnatomyTemplate.getPartDescriptors(self: AnatomyTemplateImpl): { [PartName]: PartDescriptor }
 	return table.clone(self._partDescriptors)
-end
-
-function AnatomyTemplate.getMountSpecs(self: AnatomyTemplateImpl): { MountSpec }
-	return table.clone(self._mountSpecs)
 end
 
 function AnatomyTemplate.instantiate(self: AnatomyTemplateImpl, parent: Instance?): AnatomyInstance
