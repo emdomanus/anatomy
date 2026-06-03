@@ -7,45 +7,54 @@ local DefTypes = require(script.Parent.Parent.def)
 
 export type AnatomyCategory = DefTypes.AnatomyCategory
 export type AnatomyId = DefTypes.AnatomyId
-export type AnatomyInstance = AnatomyInstanceTypes.AnatomyInstance
 export type AnatomyRole = DefTypes.AnatomyRole
 export type DescriptorMetadata = DefTypes.DescriptorMetadata
 export type PartDescriptor = DefTypes.PartDescriptor
 export type PartName = DefTypes.PartName
-export type RecognizeConfig = DefTypes.RecognizeConfig
-export type SocketDescriptor = DefTypes.SocketDescriptor
-export type SocketName = DefTypes.SocketName
-export type SurfaceDescriptor = DefTypes.SurfaceDescriptor
-export type SurfaceName = DefTypes.SurfaceName
+export type RecognizeConfig<TSocketName, TSurfaceName> = DefTypes.RecognizeConfig<TSocketName, TSurfaceName>
+export type SocketDescriptor<TSocketName> = DefTypes.SocketDescriptor<TSocketName>
+export type SurfaceDescriptor<TSurfaceName> = DefTypes.SurfaceDescriptor<TSurfaceName>
 
-export type AnatomyTemplate = {
-	getId: (self: AnatomyTemplate) -> AnatomyId?,
-	getRole: (self: AnatomyTemplate) -> AnatomyRole,
-	getCategory: (self: AnatomyTemplate) -> AnatomyCategory?,
-	getSource: (self: AnatomyTemplate) -> Instance,
-	getMetadata: (self: AnatomyTemplate) -> DescriptorMetadata?,
+export type AnatomyTemplate<TSocketName, TSurfaceName> = {
+	getId: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> AnatomyId?,
+	getRole: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> AnatomyRole,
+	getCategory: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> AnatomyCategory?,
+	getSource: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> Instance,
+	getMetadata: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> DescriptorMetadata?,
 
-	getSocketDescriptor: (self: AnatomyTemplate, name: SocketName) -> SocketDescriptor?,
-	getSocketDescriptors: (self: AnatomyTemplate) -> { [SocketName]: SocketDescriptor },
-	getSurfaceDescriptor: (self: AnatomyTemplate, name: SurfaceName) -> SurfaceDescriptor?,
-	getSurfaceDescriptors: (self: AnatomyTemplate) -> { [SurfaceName]: SurfaceDescriptor },
-	getPartDescriptor: (self: AnatomyTemplate, name: PartName) -> PartDescriptor?,
-	getPartDescriptors: (self: AnatomyTemplate) -> { [PartName]: PartDescriptor },
+	getSocketDescriptor: (
+		self: AnatomyTemplate<TSocketName, TSurfaceName>,
+		name: TSocketName
+	) -> SocketDescriptor<TSocketName>?,
+	getSocketDescriptors: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> { [TSocketName]: SocketDescriptor<TSocketName> },
+	getSurfaceDescriptor: (
+		self: AnatomyTemplate<TSocketName, TSurfaceName>,
+		name: TSurfaceName
+	) -> SurfaceDescriptor<TSurfaceName>?,
+	getSurfaceDescriptors: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> { [TSurfaceName]: SurfaceDescriptor<TSurfaceName> },
+	getPartDescriptor: (self: AnatomyTemplate<TSocketName, TSurfaceName>, name: PartName) -> PartDescriptor?,
+	getPartDescriptors: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> { [PartName]: PartDescriptor },
 
-	instantiate: (self: AnatomyTemplate, parent: Instance?) -> AnatomyInstance,
-	wrap: (self: AnatomyTemplate, root: Instance) -> AnatomyInstance,
+	instantiate: (
+		self: AnatomyTemplate<TSocketName, TSurfaceName>,
+		parent: Instance?
+	) -> AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>,
+	wrap: (
+		self: AnatomyTemplate<TSocketName, TSurfaceName>,
+		root: Instance
+	) -> AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>,
 }
 
-export type AnatomyTemplateImpl = AnatomyTemplate & {
+export type AnatomyTemplateImpl<TSocketName, TSurfaceName> = AnatomyTemplate<TSocketName, TSurfaceName> & {
 	_id: AnatomyId?,
 	_role: AnatomyRole,
 	_category: AnatomyCategory?,
 	_source: Instance,
-	_config: RecognizeConfig,
+	_config: RecognizeConfig<TSocketName, TSurfaceName>,
 	_metadata: DescriptorMetadata?,
 
-	_socketDescriptors: { [SocketName]: SocketDescriptor },
-	_surfaceDescriptors: { [SurfaceName]: SurfaceDescriptor },
+	_socketDescriptors: { [TSocketName]: SocketDescriptor<TSocketName> },
+	_surfaceDescriptors: { [TSurfaceName]: SurfaceDescriptor<TSurfaceName> },
 	_partDescriptors: { [PartName]: PartDescriptor },
 }
 

@@ -2,7 +2,7 @@
 --!optimize 2
 --!native
 
-local Types = require(script.Parent.Parent.types.components.anatomyPart)
+local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatomyPart)
 
 export type AnatomyPart = Types.AnatomyPart
 export type AnatomyPartImpl = Types.AnatomyPartImpl

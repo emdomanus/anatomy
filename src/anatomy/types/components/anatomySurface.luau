@@ -6,20 +6,19 @@ local DefTypes = require(script.Parent.Parent.def)
 
 export type AnatomyPath = DefTypes.AnatomyPath
 export type DescriptorMetadata = DefTypes.DescriptorMetadata
-export type SurfaceName = DefTypes.SurfaceName
 
-export type AnatomySurface = {
-	getName: (self: AnatomySurface) -> SurfaceName,
-	getInstances: (self: AnatomySurface) -> { Instance },
-	getPrimaryInstance: (self: AnatomySurface) -> Instance?,
-	getPaths: (self: AnatomySurface) -> { AnatomyPath },
-	getMetadata: (self: AnatomySurface) -> DescriptorMetadata?,
-	deconstruct: (self: AnatomySurface) -> (),
+export type AnatomySurface<TSurfaceName> = {
+	getName: (self: AnatomySurface<TSurfaceName>) -> TSurfaceName,
+	getInstances: (self: AnatomySurface<TSurfaceName>) -> { Instance },
+	getPrimaryInstance: (self: AnatomySurface<TSurfaceName>) -> Instance?,
+	getPaths: (self: AnatomySurface<TSurfaceName>) -> { AnatomyPath },
+	getMetadata: (self: AnatomySurface<TSurfaceName>) -> DescriptorMetadata?,
+	deconstruct: (self: AnatomySurface<TSurfaceName>) -> (),
 }
 
-export type AnatomySurfaceImpl = AnatomySurface & {
+export type AnatomySurfaceImpl<TSurfaceName> = AnatomySurface<TSurfaceName> & {
 	_owner: any,
-	_name: SurfaceName,
+	_name: TSurfaceName,
 	_paths: { AnatomyPath },
 	_instances: { Instance },
 	_metadata: DescriptorMetadata?,

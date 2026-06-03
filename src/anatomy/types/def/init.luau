@@ -11,8 +11,6 @@ export type AnatomyCategory = string
 export type AnatomyId = string
 export type LayerId = string
 
-export type SocketName = string
-export type SurfaceName = string
 export type PartName = string
 
 --------------------------------------------------------------------------------
@@ -33,14 +31,16 @@ export type AnatomyPath = { AnatomyPathStep }
 
 export type DescriptorMetadata = { [string]: any }
 
-export type SocketDescriptor = {
-	name: SocketName,
+export type NameGuard<TName> = (name: string) -> boolean
+
+export type SocketDescriptor<TSocketName> = {
+	name: TSocketName,
 	path: AnatomyPath,
 	metadata: DescriptorMetadata?,
 }
 
-export type SurfaceDescriptor = {
-	name: SurfaceName,
+export type SurfaceDescriptor<TSurfaceName> = {
+	name: TSurfaceName,
 	paths: { AnatomyPath },
 	metadata: DescriptorMetadata?,
 }
@@ -62,20 +62,22 @@ export type InstancePolicy = {
 	anchored: boolean?,
 }
 
-export type RecognizeOptions = {
+export type RecognizeOptions<TSocketName, TSurfaceName> = {
 	id: AnatomyId?,
 	category: AnatomyCategory?,
 
 	socketAttribute: string?,
 	surfaceAttribute: string?,
 	partAttribute: string?,
+	socketNameGuard: NameGuard<TSocketName>?,
+	surfaceNameGuard: NameGuard<TSurfaceName>?,
 
 	instancePolicy: InstancePolicy?,
 
 	metadata: DescriptorMetadata?,
 }
 
-export type RecognizeConfig = RecognizeOptions & {
+export type RecognizeConfig<TSocketName, TSurfaceName> = RecognizeOptions<TSocketName, TSurfaceName> & {
 	role: AnatomyRole,
 }
 

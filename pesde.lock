@@ -2,12 +2,5 @@
 # It is not intended for manual editing.
 format = 2
 name = "emdomanus/anatomy"
-version = "0.1.0"
+version = "0.1.1"
 target = "roblox"
-
-[graph."emdomanus/hook@0.1.1 roblox"]
-direct = ["hook", { name = "emdomanus/hook", version = "^0.1.0", index = "default" }, "standard"]
-
-[graph."emdomanus/hook@0.1.1 roblox".pkg_ref]
-ref_ty = "pesde"
-index_url = "https://github.com/pesde-pkg/index"

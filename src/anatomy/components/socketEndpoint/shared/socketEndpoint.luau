@@ -2,7 +2,7 @@
 --!optimize 2
 --!native
 
-local Types = require(script.Parent.Parent.types.components.socketEndpoint)
+local Types = require(script.Parent.Parent.Parent.Parent.types.components.socketEndpoint)
 
 export type MountAttachment = Types.MountAttachment
 export type SocketAttachmentChangedCallback = Types.SocketAttachmentChangedCallback
@@ -23,19 +23,12 @@ function StaticAttachmentEndpoint.bindAttachmentChanged(
 	self: StaticAttachmentEndpoint,
 	callback: SocketAttachmentChangedCallback,
 	runInitially: boolean?
-): number
+): () -> ()
 	if runInitially == true then
 		callback(self._attachment)
 	end
 
-	return 0
-end
-
-function StaticAttachmentEndpoint.unbindAttachmentChanged(
-	_self: StaticAttachmentEndpoint,
-	hookId: number
-): boolean
-	return hookId == 0
+	return function() end
 end
 
 local SocketEndpoint = {}

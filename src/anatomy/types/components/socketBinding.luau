@@ -2,44 +2,40 @@
 --!optimize 2
 --!native
 
-local HookModule = require(script.Parent.Parent.Parent.Parent.externalPackages.hook)
+local CallbackSetTypes = require(script.Parent.Parent.Parent.utils.callbackSet)
 local AnatomySocketTypes = require(script.Parent.anatomySocket)
 local SocketEndpointTypes = require(script.Parent.socketEndpoint)
-local DefTypes = require(script.Parent.Parent.def)
 
-type Hook<T...> = HookModule.Hook<T...>
-
-export type AnatomySocket = AnatomySocketTypes.AnatomySocket
+export type AnatomySocket<TSocketName> = AnatomySocketTypes.AnatomySocket<TSocketName>
+export type CallbackSet = CallbackSetTypes.CallbackSet
 export type MountAttachment = SocketEndpointTypes.MountAttachment
 export type SocketAttachmentChangedCallback = SocketEndpointTypes.SocketAttachmentChangedCallback
 export type SocketEndpoint = SocketEndpointTypes.SocketEndpoint
-export type SocketName = DefTypes.SocketName
 
-export type SocketChangedCallback = (AnatomySocket?) -> ()
+export type SocketChangedCallback<TSocketName> = (AnatomySocketTypes.AnatomySocket<TSocketName>?) -> ()
 
-export type SocketBinding = SocketEndpoint & {
-	getName: (self: SocketBinding) -> SocketName,
-	getSocket: (self: SocketBinding) -> AnatomySocket?,
+export type SocketBinding<TSocketName> = SocketEndpoint & {
+	getName: (self: SocketBinding<TSocketName>) -> TSocketName,
+	getSocket: (self: SocketBinding<TSocketName>) -> AnatomySocketTypes.AnatomySocket<TSocketName>?,
 	bindSocketChanged: (
-		self: SocketBinding,
-		callback: SocketChangedCallback,
+		self: SocketBinding<TSocketName>,
+		callback: SocketChangedCallback<TSocketName>,
 		runInitially: boolean?
-	) -> number,
-	unbindSocketChanged: (self: SocketBinding, hookId: number) -> boolean,
-	deconstruct: (self: SocketBinding) -> (),
+	) -> () -> (),
+	deconstruct: (self: SocketBinding<TSocketName>) -> (),
 }
 
-export type SocketBindingImpl = SocketBinding & {
-	_name: SocketName,
-	_socket: AnatomySocket?,
-	_socketChangedHook: Hook<AnatomySocket?>,
-	_attachmentChangedHook: Hook<MountAttachment?>,
-	_socketAttachmentBindId: number?,
+export type SocketBindingImpl<TSocketName> = SocketBinding<TSocketName> & {
+	_name: TSocketName,
+	_socket: AnatomySocketTypes.AnatomySocket<TSocketName>?,
+	_socketChangedCallbacks: CallbackSet,
+	_attachmentChangedCallbacks: CallbackSet,
+	_socketAttachmentDisconnect: (() -> ())?,
 	_source: any?,
-	_sourceBindId: number?,
+	_sourceDisconnect: (() -> ())?,
 	_destroyed: boolean,
 
-	_setSocket: (self: SocketBindingImpl, socket: AnatomySocket?) -> (),
+	_setSocket: (self: SocketBindingImpl<TSocketName>, socket: AnatomySocketTypes.AnatomySocket<TSocketName>?) -> (),
 }
 
 return {}

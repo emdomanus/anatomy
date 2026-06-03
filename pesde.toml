@@ -1,5 +1,5 @@
 name = "emdomanus/anatomy"
-version = "0.1.0"
+version = "0.1.1"
 description = "Renderable anatomy, socket, surface, and mounting primitives for Roblox."
 license = "MIT"
 authors = ["emdomanus"]
@@ -19,6 +19,3 @@ build_files = ["src"]
 
 [indices]
 default = "https://github.com/pesde-pkg/index"
-
-[dependencies]
-hook = { name = "emdomanus/hook", version = "^0.1.0" }

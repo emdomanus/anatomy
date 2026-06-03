@@ -2,36 +2,34 @@
 --!optimize 2
 --!native
 
-local HookModule = require(script.Parent.Parent.Parent.Parent.externalPackages.hook)
+local CallbackSetTypes = require(script.Parent.Parent.Parent.utils.callbackSet)
 local SocketEndpointTypes = require(script.Parent.socketEndpoint)
 local DefTypes = require(script.Parent.Parent.def)
 
-type Hook<T...> = HookModule.Hook<T...>
-
 export type AnatomyPath = DefTypes.AnatomyPath
 export type DescriptorMetadata = DefTypes.DescriptorMetadata
+export type CallbackSet = CallbackSetTypes.CallbackSet
 export type MountAttachment = SocketEndpointTypes.MountAttachment
 export type SocketEndpoint = SocketEndpointTypes.SocketEndpoint
-export type SocketName = DefTypes.SocketName
 export type SocketAttachmentChangedCallback = SocketEndpointTypes.SocketAttachmentChangedCallback
 
-export type AnatomySocket = SocketEndpoint & {
-	getName: (self: AnatomySocket) -> SocketName,
-	getPath: (self: AnatomySocket) -> AnatomyPath,
-	getMetadata: (self: AnatomySocket) -> DescriptorMetadata?,
-	deconstruct: (self: AnatomySocket) -> (),
+export type AnatomySocket<TSocketName> = SocketEndpoint & {
+	getName: (self: AnatomySocket<TSocketName>) -> TSocketName,
+	getPath: (self: AnatomySocket<TSocketName>) -> AnatomyPath,
+	getMetadata: (self: AnatomySocket<TSocketName>) -> DescriptorMetadata?,
+	deconstruct: (self: AnatomySocket<TSocketName>) -> (),
 }
 
-export type AnatomySocketImpl = AnatomySocket & {
+export type AnatomySocketImpl<TSocketName> = AnatomySocket<TSocketName> & {
 	_owner: any,
-	_name: SocketName,
+	_name: TSocketName,
 	_path: AnatomyPath,
 	_attachment: MountAttachment?,
 	_metadata: DescriptorMetadata?,
-	_attachmentChangedHook: Hook<MountAttachment?>,
+	_attachmentChangedCallbacks: CallbackSet,
 	_destroyed: boolean,
 
-	_setAttachment: (self: AnatomySocketImpl, attachment: MountAttachment?) -> (),
+	_setAttachment: (self: AnatomySocketImpl<TSocketName>, attachment: MountAttachment?) -> (),
 }
 
 return {}

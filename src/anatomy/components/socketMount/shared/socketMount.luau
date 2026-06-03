@@ -2,7 +2,7 @@
 --!optimize 2
 --!native
 
-local Types = require(script.Parent.Parent.types.components.socketMount)
+local Types = require(script.Parent.Parent.Parent.Parent.types.components.socketMount)
 
 export type MountAttachment = Types.MountAttachment
 export type SocketEndpoint = Types.SocketEndpoint
@@ -41,16 +41,16 @@ function SocketMount.new(
 	self._fromAttachment = nil
 	self._toAttachment = nil
 	self._rigid = nil
-	self._fromAttachmentBindId = nil
-	self._toAttachmentBindId = nil
+	self._fromAttachmentDisconnect = nil
+	self._toAttachmentDisconnect = nil
 	self._enabled = self._options.enabled ~= false
 	self._destroyed = false
 
-	self._fromAttachmentBindId = fromEndpoint:bindAttachmentChanged(function(attachment: Attachment?)
+	self._fromAttachmentDisconnect = fromEndpoint:bindAttachmentChanged(function(attachment: Attachment?)
 		self:_setFromAttachment(attachment)
 	end, true)
 
-	self._toAttachmentBindId = toEndpoint:bindAttachmentChanged(function(attachment: Attachment?)
+	self._toAttachmentDisconnect = toEndpoint:bindAttachmentChanged(function(attachment: Attachment?)
 		self:_setToAttachment(attachment)
 	end, true)
 
@@ -143,11 +143,11 @@ function SocketMount.deconstruct(self: SocketMountImpl): ()
 
 	self._destroyed = true
 
-	if self._fromAttachmentBindId ~= nil then
-		self._fromEndpoint:unbindAttachmentChanged(self._fromAttachmentBindId)
+	if self._fromAttachmentDisconnect ~= nil then
+		self._fromAttachmentDisconnect()
 	end
-	if self._toAttachmentBindId ~= nil then
-		self._toEndpoint:unbindAttachmentChanged(self._toAttachmentBindId)
+	if self._toAttachmentDisconnect ~= nil then
+		self._toAttachmentDisconnect()
 	end
 
 	if self._rigid ~= nil then
@@ -159,6 +159,8 @@ function SocketMount.deconstruct(self: SocketMountImpl): ()
 	self._rigid = nil
 	self._fromEndpoint = nil :: any
 	self._toEndpoint = nil :: any
+	self._fromAttachmentDisconnect = nil
+	self._toAttachmentDisconnect = nil
 end
 
 return SocketMount

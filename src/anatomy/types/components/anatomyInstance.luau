@@ -12,37 +12,42 @@ export type AnatomyId = DefTypes.AnatomyId
 export type AnatomyPart = AnatomyPartTypes.AnatomyPart
 export type AnatomyPartImpl = AnatomyPartTypes.AnatomyPartImpl
 export type AnatomyRole = DefTypes.AnatomyRole
-export type AnatomySocket = AnatomySocketTypes.AnatomySocket
-export type AnatomySocketImpl = AnatomySocketTypes.AnatomySocketImpl
-export type AnatomySurface = AnatomySurfaceTypes.AnatomySurface
-export type AnatomySurfaceImpl = AnatomySurfaceTypes.AnatomySurfaceImpl
 export type DescriptorMetadata = DefTypes.DescriptorMetadata
 export type InstancePolicy = DefTypes.InstancePolicy
 export type PartName = DefTypes.PartName
-export type SocketName = DefTypes.SocketName
-export type SurfaceName = DefTypes.SurfaceName
+export type PartDescriptor = DefTypes.PartDescriptor
+export type SocketDescriptor<TSocketName> = DefTypes.SocketDescriptor<TSocketName>
+export type SurfaceDescriptor<TSurfaceName> = DefTypes.SurfaceDescriptor<TSurfaceName>
 
-export type AnatomyInstance = {
-	getId: (self: AnatomyInstance) -> AnatomyId?,
-	getRole: (self: AnatomyInstance) -> AnatomyRole,
-	getCategory: (self: AnatomyInstance) -> AnatomyCategory?,
-	getRoot: (self: AnatomyInstance) -> Instance,
-	getTemplate: (self: AnatomyInstance) -> any,
-	getMetadata: (self: AnatomyInstance) -> DescriptorMetadata?,
+export type AnatomyInstance<TSocketName, TSurfaceName> = {
+	getId: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> AnatomyId?,
+	getRole: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> AnatomyRole,
+	getCategory: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> AnatomyCategory?,
+	getRoot: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> Instance,
+	getTemplate: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> any,
+	getMetadata: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> DescriptorMetadata?,
 
-	getSocket: (self: AnatomyInstance, name: SocketName) -> AnatomySocket?,
-	getSockets: (self: AnatomyInstance) -> { [SocketName]: AnatomySocket },
-	getSurface: (self: AnatomyInstance, name: SurfaceName) -> AnatomySurface?,
-	getSurfaces: (self: AnatomyInstance) -> { [SurfaceName]: AnatomySurface },
-	getPart: (self: AnatomyInstance, name: PartName) -> AnatomyPart?,
-	getParts: (self: AnatomyInstance) -> { [PartName]: AnatomyPart },
+	getSocket: (
+		self: AnatomyInstance<TSocketName, TSurfaceName>,
+		name: TSocketName
+	) -> AnatomySocketTypes.AnatomySocket<TSocketName>?,
+	getSockets: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> { [TSocketName]: AnatomySocketTypes.AnatomySocket<TSocketName> },
+	getSurface: (
+		self: AnatomyInstance<TSocketName, TSurfaceName>,
+		name: TSurfaceName
+	) -> AnatomySurfaceTypes.AnatomySurface<TSurfaceName>?,
+	getSurfaces: (
+		self: AnatomyInstance<TSocketName, TSurfaceName>
+	) -> { [TSurfaceName]: AnatomySurfaceTypes.AnatomySurface<TSurfaceName> },
+	getPart: (self: AnatomyInstance<TSocketName, TSurfaceName>, name: PartName) -> AnatomyPart?,
+	getParts: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> { [PartName]: AnatomyPart },
 
-	setParent: (self: AnatomyInstance, parent: Instance?) -> (),
-	applyInstancePolicy: (self: AnatomyInstance, policy: InstancePolicy) -> (),
-	deconstruct: (self: AnatomyInstance) -> (),
+	setParent: (self: AnatomyInstance<TSocketName, TSurfaceName>, parent: Instance?) -> (),
+	applyInstancePolicy: (self: AnatomyInstance<TSocketName, TSurfaceName>, policy: InstancePolicy) -> (),
+	deconstruct: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> (),
 }
 
-export type AnatomyInstanceImpl = AnatomyInstance & {
+export type AnatomyInstanceImpl<TSocketName, TSurfaceName> = AnatomyInstance<TSocketName, TSurfaceName> & {
 	_template: any,
 	_root: Instance,
 	_id: AnatomyId?,
@@ -51,15 +56,21 @@ export type AnatomyInstanceImpl = AnatomyInstance & {
 	_metadata: DescriptorMetadata?,
 	_ownsRoot: boolean,
 
-	_sockets: { [SocketName]: AnatomySocketImpl },
-	_surfaces: { [SurfaceName]: AnatomySurfaceImpl },
+	_sockets: { [TSocketName]: AnatomySocketTypes.AnatomySocketImpl<TSocketName> },
+	_surfaces: { [TSurfaceName]: AnatomySurfaceTypes.AnatomySurfaceImpl<TSurfaceName> },
 	_parts: { [PartName]: AnatomyPartImpl },
 	_destroyed: boolean,
 
-	_resolvePath: (self: AnatomyInstanceImpl, path: DefTypes.AnatomyPath) -> Instance?,
-	_buildSocket: (self: AnatomyInstanceImpl, descriptor: DefTypes.SocketDescriptor) -> AnatomySocketImpl?,
-	_buildSurface: (self: AnatomyInstanceImpl, descriptor: DefTypes.SurfaceDescriptor) -> AnatomySurfaceImpl?,
-	_buildPart: (self: AnatomyInstanceImpl, descriptor: DefTypes.PartDescriptor) -> AnatomyPartImpl?,
+	_resolvePath: (self: AnatomyInstanceImpl<TSocketName, TSurfaceName>, path: DefTypes.AnatomyPath) -> Instance?,
+	_buildSocket: (
+		self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
+		descriptor: DefTypes.SocketDescriptor<TSocketName>
+	) -> AnatomySocketTypes.AnatomySocketImpl<TSocketName>,
+	_buildSurface: (
+		self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
+		descriptor: DefTypes.SurfaceDescriptor<TSurfaceName>
+	) -> AnatomySurfaceTypes.AnatomySurfaceImpl<TSurfaceName>,
+	_buildPart: (self: AnatomyInstanceImpl<TSocketName, TSurfaceName>, descriptor: DefTypes.PartDescriptor) -> AnatomyPartImpl,
 }
 
 return {}

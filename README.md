@@ -14,14 +14,7 @@ skills, teams, collision capsules, or world policy.
 pesde install
 ```
 
-Anatomy's direct pesde dependency is:
-
-```toml
-hook = { name = "emdomanus/hook", version = "^0.1.0" }
-```
-
-The dev Rojo project mounts the generated `roblox_packages` folder beside Anatomy
-under `ReplicatedStorage.packages`.
+The dev Rojo project mounts Anatomy directly under `ReplicatedStorage.packages`.
 
 ## Concepts
 
@@ -62,13 +55,19 @@ local recognizeOptions = {
 	},
 }
 
-local rigTemplate = Anatomy.recognizeRig(rigAsset, recognizeOptions)
-local weaponTemplate = Anatomy.recognizeAddon(weaponAsset, recognizeOptions)
+local rigConfig = table.clone(recognizeOptions)
+rigConfig.role = "rig"
+
+local weaponConfig = table.clone(recognizeOptions)
+weaponConfig.role = "addon"
+
+local rigTemplate = Anatomy.anatomyTemplate.recognize(rigAsset, rigConfig)
+local weaponTemplate = Anatomy.anatomyTemplate.recognize(weaponAsset, weaponConfig)
 
 local rig = rigTemplate:instantiate(workspace)
 local weapon = weaponTemplate:instantiate(workspace)
 
-local host = Anatomy.createHost()
+local host = Anatomy.anatomyHost.new()
 host:push(rig, {
 	id = "rig",
 	priority = 0,
@@ -96,8 +95,9 @@ print(weaponMount:isConnected())
 
 When the `weapon` layer is removed and another weapon layer is pushed with the
 same id, any mount or binding that targets that layer will retarget automatically.
-Preview and editor tooling can use `host:getSocketNames()` or `host:getSockets()`
-to inspect the currently resolved socket set.
+Preview and editor tooling can use `host:getSocketNames()`, `host:getSockets()`,
+`host:getSurfaceNames()`, or `host:getSurfaces()` to inspect the currently resolved
+socket and surface sets.
 
 ## VFX And Preview Tools
 

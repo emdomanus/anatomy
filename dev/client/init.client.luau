@@ -6,6 +6,7 @@ local Workspace = game:GetService("Workspace")
 
 local Anatomy = require(ReplicatedStorage:WaitForChild("packages"):WaitForChild("anatomy"))
 
+
 local DEV_ROOT_NAME = "AnatomyDev"
 local SOCKET_ATTRIBUTE = "AnatomySocket"
 local SURFACE_ATTRIBUTE = "AnatomySurface"
@@ -45,6 +46,55 @@ local recognizeOptions = {
 		massless = true,
 	},
 }
+
+local function buildRecognizeConfig<TSocketName, TSurfaceName>(
+	role: "rig" | "addon",
+	options: Anatomy.RecognizeOptions<TSocketName, TSurfaceName>
+): Anatomy.RecognizeConfig<TSocketName, TSurfaceName>
+	return {
+		id = options.id,
+		category = options.category,
+		socketAttribute = options.socketAttribute,
+		surfaceAttribute = options.surfaceAttribute,
+		partAttribute = options.partAttribute,
+		socketNameGuard = options.socketNameGuard,
+		surfaceNameGuard = options.surfaceNameGuard,
+		instancePolicy = options.instancePolicy,
+		metadata = options.metadata,
+		role = role,
+	}
+end
+
+local function recognizeRig<TSocketName, TSurfaceName>(
+	root: Instance,
+	options: Anatomy.RecognizeOptions<TSocketName, TSurfaceName>
+): Anatomy.AnatomyTemplate<TSocketName, TSurfaceName>
+	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig("rig", options))
+end
+
+local function recognizeAddon<TSocketName, TSurfaceName>(
+	root: Instance,
+	options: Anatomy.RecognizeOptions<TSocketName, TSurfaceName>
+): Anatomy.AnatomyTemplate<TSocketName, TSurfaceName>
+	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig("addon", options))
+end
+
+local function wrap<TSocketName, TSurfaceName>(
+	root: Instance,
+	template: Anatomy.AnatomyTemplate<TSocketName, TSurfaceName>
+): Anatomy.AnatomyInstance<TSocketName, TSurfaceName>
+	return template:wrap(root)
+end
+
+local function createHost<TSocketName, TSurfaceName>(
+	options: Anatomy.AnatomyHostOptions<TSocketName, TSurfaceName>?
+): Anatomy.AnatomyHost<TSocketName, TSurfaceName>
+	return Anatomy.anatomyHost.new(options)
+end
+
+local function attach(from: Attachment, to: Attachment, options: Anatomy.SocketMountOptions?): Anatomy.SocketMount
+	return Anatomy.socketMount.new(Anatomy.socketEndpoint.fromAttachment(from), Anatomy.socketEndpoint.fromAttachment(to), options)
+end
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -298,10 +348,10 @@ local function makeTemplate(kind: DevModelKind, name: string, color: Color3, ori
 	local asset = if kind == "rig" then makeRigAsset(name, color, origin) else makeWeaponAsset(name, color, origin)
 
 	if kind == "rig" then
-		return Anatomy.recognizeRig(asset, recognizeOptions)
+		return recognizeRig(asset, recognizeOptions)
 	end
 
-	return Anatomy.recognizeAddon(asset, recognizeOptions)
+	return recognizeAddon(asset, recognizeOptions)
 end
 
 local function makeInstance(kind: DevModelKind, name: string, color: Color3, origin: CFrame, parent: Instance?): any
@@ -397,22 +447,22 @@ end
 local function testRecognitionGuards(): ()
 	local duplicateSocketAsset = makeDuplicateSocketAsset()
 	expectError(function()
-		Anatomy.recognizeRig(duplicateSocketAsset, recognizeOptions)
+		recognizeRig(duplicateSocketAsset, recognizeOptions)
 	end, "Duplicate sockets should error during recognition")
 	duplicateSocketAsset:Destroy()
 
 	local badSocketAsset = makeBadSocketAsset()
 	expectError(function()
-		Anatomy.recognizeRig(badSocketAsset, recognizeOptions)
+		recognizeRig(badSocketAsset, recognizeOptions)
 	end, "Socket attributes on non-Attachments should error during recognition")
 	badSocketAsset:Destroy()
 end
 
 local function testWrapAndInstantiateOwnership(): ()
 	local source = makeRigAsset("OwnershipRig", Color3.fromRGB(170, 130, 255), CFrame.new(-5, 2, 0))
-	local template = Anatomy.recognizeRig(source, recognizeOptions)
+	local template = recognizeRig(source, recognizeOptions)
 
-	local wrapped = Anatomy.wrap(source, template)
+	local wrapped = wrap(source, template)
 	wrapped:deconstruct()
 	expect(source.Parent == devRoot, "Wrapped anatomy deconstruct should not destroy the wrapped root")
 
@@ -442,9 +492,9 @@ local function testStaticAttach(): ()
 	expect(blade.Anchored == false, "Weapon blade should be unanchored before mounting")
 	expect(weapon:getRoot():FindFirstChild("BladeToHandle", true) ~= nil, "Weapon should contain an internal blade constraint")
 
-	local mount = Anatomy.attach(weaponAttachment, rigAttachment, {
+	local mount = attach(weaponAttachment, rigAttachment, {
 		name = "StaticAttach",
-		parent = devRoot,
+		parent = devRoot :: Instance,
 	})
 
 	expect(mount:isConnected(), "Static attach should connect once both attachments exist")
@@ -453,18 +503,19 @@ local function testStaticAttach(): ()
 
 	local constraint = mount:getConstraint()
 	expect(constraint ~= nil, "Static attach should create a RigidConstraint")
-	expect(constraint.Attachment0 == weaponAttachment, "RigidConstraint Attachment0 mismatch")
-	expect(constraint.Attachment1 == rigAttachment, "RigidConstraint Attachment1 mismatch")
+	local rigid = constraint :: RigidConstraint
+	expect(rigid.Attachment0 == weaponAttachment, "RigidConstraint Attachment0 mismatch")
+	expect(rigid.Attachment1 == rigAttachment, "RigidConstraint Attachment1 mismatch")
 
 	mount:deconstruct()
-	expect(constraint.Parent == nil, "Static mount deconstruct should destroy its constraint")
+	expect(rigid.Parent == nil, "Static mount deconstruct should destroy its constraint")
 
 	rig:deconstruct()
 	weapon:deconstruct()
 end
 
 local function testHostReactiveSocketsAndMounts(): ()
-	local host = Anatomy.createHost({
+	local host = createHost({
 		id = "ReactiveUnitHost",
 	})
 
@@ -488,9 +539,31 @@ local function testHostReactiveSocketsAndMounts(): ()
 	})
 
 	local attachmentChangeCount = 0
-	local attachmentBindId = rightGripBinding:bindAttachmentChanged(function(_attachment: Attachment?)
+	local disconnectAttachmentChanged = rightGripBinding:bindAttachmentChanged(function(_attachment: Attachment?)
 		attachmentChangeCount += 1
 	end, true)
+
+	local bodySurfaceChangeCount = 0
+	local resolvedBodySurface: any? = nil
+	local disconnectBodySurface = host:bindSurface("body", function(surface: any?)
+		bodySurfaceChangeCount += 1
+		resolvedBodySurface = surface
+	end, true)
+
+	local metalSurfaceAddCount = 0
+	local metalSurfaceRemoveCount = 0
+	local lastAddedMetalSurface: any? = nil
+	local lastRemovedMetalSurface: any? = nil
+	local disconnectMetalAdded = host:bindSurfaceAdded("metal", function(surface: any, layer: any)
+		metalSurfaceAddCount += 1
+		lastAddedMetalSurface = surface
+		expect(layer.id == "weapon", "Metal surface add should come from the weapon layer")
+	end, true)
+	local disconnectMetalRemoved = host:bindSurfaceRemoved("metal", function(surface: any, layer: any)
+		metalSurfaceRemoveCount += 1
+		lastRemovedMetalSurface = surface
+		expect(layer.id == "weapon", "Metal surface remove should come from the weapon layer")
+	end)
 
 	local mount = host:mount({
 		from = {
@@ -502,32 +575,56 @@ local function testHostReactiveSocketsAndMounts(): ()
 		},
 		options = {
 			name = "ReactiveWeaponMount",
-			parent = devRoot,
+			parent = devRoot :: Instance,
 		},
 	})
 
 	expect(rightGripBinding:getAttachment() == getSocketAttachment(rigA, "rightGrip"), "Host should expose rig A rightGrip")
 	expect(weaponGripBinding:getAttachment() == getSocketAttachment(weaponA, "weaponGrip"), "Host should expose weapon A grip")
+	expect(host:getSurface("body") == rigA:getSurface("body"), "Host should expose rig A body surface")
+	expect(host:getSurface("metal") == weaponA:getSurface("metal"), "Host should expose weapon A metal surface")
+	expect(resolvedBodySurface == rigA:getSurface("body"), "Surface binding should report initial rig body")
+	expect(bodySurfaceChangeCount == 1, "Surface binding should run initially once")
+	expect(metalSurfaceAddCount == 1, "Surface added binding should run initially for weapon A")
+	expect(lastAddedMetalSurface == weaponA:getSurface("metal"), "Initial metal surface add should be weapon A")
+	expect(countDictionary(host:getSurfaces()) == 2, "Host should expose body and metal surfaces")
+	expect(countDictionary(host:getSurfaces({
+		layerId = "weapon",
+	})) == 1, "Layer surface query should expose only weapon surfaces")
 	expect(mount:isConnected(), "Reactive host mount should connect initially")
 
 	host:remove("weapon")
+	expect(metalSurfaceRemoveCount == 1, "Surface removed binding should fire when weapon layer is removed")
+	expect(lastRemovedMetalSurface == weaponA:getSurface("metal"), "Removed metal surface should be weapon A")
 	host:push(weaponB, {
 		id = "weapon",
 		priority = 10,
 	})
 	expect(weaponGripBinding:getAttachment() == getSocketAttachment(weaponB, "weaponGrip"), "Weapon binding should follow weapon layer swap")
 	expect(mount:getFromAttachment() == getSocketAttachment(weaponB, "weaponGrip"), "Reactive mount should follow weapon layer swap")
+	expect(host:getSurface("metal") == weaponB:getSurface("metal"), "Host metal surface should follow weapon layer swap")
+	expect(metalSurfaceAddCount == 2, "Surface added binding should fire when weapon B is pushed")
+	expect(lastAddedMetalSurface == weaponB:getSurface("metal"), "Added metal surface should be weapon B")
 
 	host:remove("rig")
+	expect(host:getSurface("body") == nil, "Host body surface should clear when rig layer is removed")
+	expect(resolvedBodySurface == nil, "Surface binding should report nil when rig layer is removed")
+	expect(bodySurfaceChangeCount == 2, "Surface binding should fire for initial and removed rig body")
 	host:push(rigB, {
 		id = "rig",
 		priority = 0,
 	})
 	expect(rightGripBinding:getAttachment() == getSocketAttachment(rigB, "rightGrip"), "Rig binding should follow rig layer swap")
 	expect(mount:getToAttachment() == getSocketAttachment(rigB, "rightGrip"), "Reactive mount should follow rig layer swap")
+	expect(host:getSurface("body") == rigB:getSurface("body"), "Host body surface should follow rig layer swap")
+	expect(resolvedBodySurface == rigB:getSurface("body"), "Surface binding should report swapped rig body")
+	expect(bodySurfaceChangeCount == 3, "Surface binding should fire for initial, removed, and swapped rig body")
 	expect(attachmentChangeCount >= 2, "Right grip binding should report initial and swapped attachments")
 
-	rightGripBinding:unbindAttachmentChanged(attachmentBindId)
+	disconnectAttachmentChanged()
+	disconnectBodySurface()
+	disconnectMetalAdded()
+	disconnectMetalRemoved()
 	rightGripBinding:deconstruct()
 	weaponGripBinding:deconstruct()
 	host:deconstruct()
@@ -538,7 +635,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 end
 
 local function testOverrideResolution(): ()
-	local host = Anatomy.createHost({
+	local host = createHost({
 		id = "OverrideHost",
 	})
 
@@ -609,7 +706,10 @@ local function runTests(): ()
 	local startedAt = os.clock()
 
 	for _, test in tests do
-		local ok, err = pcall(test.run)
+		local ok, err = pcall(function()
+			test.run()
+			return nil
+		end)
 		if ok then
 			passed += 1
 			appendLog("PASS " .. test.name)
@@ -665,11 +765,11 @@ local function runStressBenchmark(count: number): ()
 	runBenchmark("create + destroy " .. tostring(count) .. " static mounts", function()
 		local mounts: { any } = table.create(count)
 		for index = 1, count do
-			mounts[index] = Anatomy.attach(
+			mounts[index] = attach(
 				getSocketAttachment(weaponInstances[index], "weaponGrip"),
 				getSocketAttachment(rigInstances[index], "rightGrip"),
 				{
-					parent = benchmarkFolder,
+					parent = benchmarkFolder :: Instance,
 				}
 			)
 		end
@@ -680,7 +780,7 @@ local function runStressBenchmark(count: number): ()
 	end)
 
 	runBenchmark("swap host layers " .. tostring(count) .. " times", function()
-		local host = Anatomy.createHost({
+		local host = createHost({
 			id = "BenchmarkHost",
 		})
 		host:push(rigInstances[1], {
@@ -701,7 +801,7 @@ local function runStressBenchmark(count: number): ()
 				socket = "rightGrip",
 			},
 			options = {
-				parent = benchmarkFolder,
+				parent = benchmarkFolder :: Instance,
 			},
 		})
 
@@ -792,7 +892,7 @@ local function refreshDemoLayers(): ()
 end
 
 local function setupDemo(): ()
-	local host = Anatomy.createHost({
+	local host = createHost({
 		id = "InteractiveDemoHost",
 	})
 	demoState.host = host
@@ -816,7 +916,7 @@ local function setupDemo(): ()
 		},
 		options = {
 			name = "InteractiveReactiveMount",
-			parent = devRoot,
+			parent = devRoot :: Instance,
 		},
 	})
 
@@ -843,9 +943,9 @@ local function attachStaticDemo(): ()
 
 	local rig = demoState.rigInstances[demoState.activeRigIndex]
 	local weapon = demoState.weaponInstances[demoState.activeWeaponIndex]
-	demoState.directMount = Anatomy.attach(getSocketAttachment(weapon, "weaponGrip"), getSocketAttachment(rig, "leftGrip"), {
+	demoState.directMount = attach(getSocketAttachment(weapon, "weaponGrip"), getSocketAttachment(rig, "leftGrip"), {
 		name = "InteractiveStaticMount",
-		parent = devRoot,
+		parent = devRoot :: Instance,
 	})
 	appendLog("Static demo mount attached weaponGrip to leftGrip.")
 end
@@ -871,7 +971,7 @@ local function rebuildReactiveDemoMount(): ()
 		},
 		options = {
 			name = "InteractiveReactiveMount",
-			parent = devRoot,
+			parent = devRoot :: Instance,
 		},
 	})
 	appendLog("Reactive demo mount rebuilt.")

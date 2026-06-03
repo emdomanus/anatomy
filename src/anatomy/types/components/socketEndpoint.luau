@@ -11,8 +11,7 @@ export type SocketEndpoint = {
 		self: any,
 		callback: SocketAttachmentChangedCallback,
 		runInitially: boolean?
-	) -> number,
-	unbindAttachmentChanged: (self: any, hookId: number) -> boolean,
+	) -> () -> (),
 }
 
 return {}
