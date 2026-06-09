@@ -73,7 +73,7 @@ function AnatomyHostLayer.setPriority<TSocketName, TSurfaceName>(
 	self._priority = priority
 	sortLayers(self._host._layerOrder)
 	self._host:_refreshAllSockets()
-	self._host:_refreshAllSurfaces()
+	self._host:_refreshAllWatchedPrefixes()
 end
 
 function AnatomyHostLayer.remove<TSocketName, TSurfaceName>(self: AnatomyHostLayerImpl<TSocketName, TSurfaceName>): ()

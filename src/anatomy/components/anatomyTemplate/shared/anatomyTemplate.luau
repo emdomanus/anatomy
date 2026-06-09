@@ -18,7 +18,7 @@ export type PartDescriptor = Types.PartDescriptor
 export type PartName = Types.PartName
 export type RecognizeConfig<TSocketName, TSurfaceName> = Types.RecognizeConfig<TSocketName, TSurfaceName>
 export type SocketDescriptor<TSocketName> = Types.SocketDescriptor<TSocketName>
-export type SurfaceDescriptor<TSurfaceName> = Types.SurfaceDescriptor<TSurfaceName>
+export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
 
 local AnatomyTemplate = {}
 AnatomyTemplate.__index = AnatomyTemplate
@@ -58,6 +58,74 @@ local function readNamedAttribute(instance: Instance, attributeName: string, des
 	return value :: string
 end
 
+local function trim(value: string): string
+	return (string.gsub(value, "^%s*(.-)%s*$", "%1"))
+end
+
+local function addTagPrefixes(prefixes: { [string]: true }, tagPath: string, tagPathDelimiter: string): ()
+	local segments = string.split(tagPath, tagPathDelimiter)
+	local prefix = ""
+
+	for _, segment in segments do
+		if segment == "" then
+			continue
+		end
+
+		prefix = if prefix == "" then segment else `{prefix}{tagPathDelimiter}{segment}`
+		prefixes[prefix] = true
+	end
+end
+
+local function readTagList<TagT>(
+	instance: Instance,
+	tagsAttribute: string,
+	tagDelimiter: string,
+	tagPathDelimiter: string,
+	tagGuard: ((path: string) -> TagT?)?,
+	root: Instance
+): ({ [TagT]: true }?, { [string]: true }?)
+	local value = instance:GetAttribute(tagsAttribute)
+	if value == nil then
+		return nil, nil
+	end
+	if typeof(value) ~= "string" then
+		error(`Anatomy tag attribute "{tagsAttribute}" on {instance:GetFullName()} must be a string`, 3)
+	end
+
+	local rawTags = value :: string
+	if rawTags == "" then
+		return nil, nil
+	end
+
+	local tags: { [TagT]: true } = {}
+	local prefixes: { [string]: true } = {}
+
+	for _, rawTag in string.split(rawTags, tagDelimiter) do
+		local tagPath = trim(rawTag)
+		if tagPath == "" then
+			continue
+		end
+
+		local tag = if tagGuard == nil then (tagPath :: any) :: TagT else tagGuard(tagPath)
+		if tag == nil then
+			error(`Anatomy tag "{tagPath}" is not allowed in {root:GetFullName()}`, 3)
+		end
+
+		tags[tag] = true
+		addTagPrefixes(prefixes, tagPath, tagPathDelimiter)
+	end
+
+	return tags, prefixes
+end
+
+local function hasEntries(values: { [any]: any }): boolean
+	for _ in values do
+		return true
+	end
+
+	return false
+end
+
 local function makeSearchList(root: Instance): { Instance }
 	local list = table.create(#root:GetDescendants() + 1)
 	table.insert(list, root)
@@ -74,11 +142,13 @@ function AnatomyTemplate.recognize<TSocketName, TSurfaceName>(
 	config: RecognizeConfig<TSocketName, TSurfaceName>
 ): AnatomyTemplate<TSocketName, TSurfaceName>
 	local socketAttribute = getAttributeName(config, "socketAttribute")
-	local surfaceAttribute = getAttributeName(config, "surfaceAttribute")
 	local partAttribute = getAttributeName(config, "partAttribute")
+	local tagsAttribute = getAttributeName(config, "tagsAttribute")
+	local tagDelimiter = if config.tagDelimiter ~= nil and config.tagDelimiter ~= "" then config.tagDelimiter else ";"
+	local tagPathDelimiter = if config.tagPathDelimiter ~= nil and config.tagPathDelimiter ~= "" then config.tagPathDelimiter else "."
 
 	local socketDescriptors: { [TSocketName]: SocketDescriptor<TSocketName> } = {}
-	local surfaceDescriptors: { [TSurfaceName]: SurfaceDescriptor<TSurfaceName> } = {}
+	local tagDescriptors: { TagDescriptor<TSurfaceName> } = {}
 	local partDescriptors: { [PartName]: PartDescriptor } = {}
 
 	for _, instance in makeSearchList(root) do
@@ -104,21 +174,15 @@ function AnatomyTemplate.recognize<TSocketName, TSurfaceName>(
 			end
 		end
 
-		if surfaceAttribute ~= nil then
-			local surfaceName = readNamedAttribute(instance, surfaceAttribute, "surface")
-			if surfaceName ~= nil then
-				assertNameAllowed(surfaceName, config.surfaceNameGuard, "surface", root)
-				local typedSurfaceName = (surfaceName :: any) :: TSurfaceName
-				local descriptor = surfaceDescriptors[typedSurfaceName]
-				if descriptor == nil then
-					descriptor = {
-						name = typedSurfaceName,
-						paths = {},
-					}
-					surfaceDescriptors[typedSurfaceName] = descriptor
-				end
-
-				table.insert(descriptor.paths, Path.fromRoot(root, instance))
+		if tagsAttribute ~= nil then
+			local tags, prefixes =
+				readTagList(instance, tagsAttribute, tagDelimiter, tagPathDelimiter, config.tagGuard, root)
+			if tags ~= nil and prefixes ~= nil and hasEntries(tags) then
+				table.insert(tagDescriptors, {
+					path = Path.fromRoot(root, instance),
+					tags = tags,
+					prefixes = prefixes,
+				})
 			end
 		end
 
@@ -137,15 +201,15 @@ function AnatomyTemplate.recognize<TSocketName, TSurfaceName>(
 		end
 	end
 
-	return AnatomyTemplate.new(root, config, socketDescriptors, surfaceDescriptors, partDescriptors)
+	return AnatomyTemplate.new(root, config, socketDescriptors, partDescriptors, tagDescriptors)
 end
 
 function AnatomyTemplate.new<TSocketName, TSurfaceName>(
 	source: Instance,
 	config: RecognizeConfig<TSocketName, TSurfaceName>,
 	socketDescriptors: { [TSocketName]: SocketDescriptor<TSocketName> }?,
-	surfaceDescriptors: { [TSurfaceName]: SurfaceDescriptor<TSurfaceName> }?,
-	partDescriptors: { [PartName]: PartDescriptor }?
+	partDescriptors: { [PartName]: PartDescriptor }?,
+	tagDescriptors: { TagDescriptor<TSurfaceName> }?
 ): AnatomyTemplate<TSocketName, TSurfaceName>
 	local self: AnatomyTemplateImpl<TSocketName, TSurfaceName> = setmetatable({}, AnatomyTemplate) :: any
 
@@ -156,7 +220,7 @@ function AnatomyTemplate.new<TSocketName, TSurfaceName>(
 	self._config = config
 	self._metadata = config.metadata
 	self._socketDescriptors = socketDescriptors or {}
-	self._surfaceDescriptors = surfaceDescriptors or {}
+	self._tagDescriptors = tagDescriptors or {}
 	self._partDescriptors = partDescriptors or {}
 
 	return self
@@ -199,17 +263,10 @@ function AnatomyTemplate.getSocketDescriptors<TSocketName, TSurfaceName>(
 	return table.clone(self._socketDescriptors)
 end
 
-function AnatomyTemplate.getSurfaceDescriptor<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName
-): SurfaceDescriptor<TSurfaceName>?
-	return self._surfaceDescriptors[name]
-end
-
-function AnatomyTemplate.getSurfaceDescriptors<TSocketName, TSurfaceName>(
+function AnatomyTemplate.getTagDescriptors<TSocketName, TSurfaceName>(
 	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>
-): { [TSurfaceName]: SurfaceDescriptor<TSurfaceName> }
-	return table.clone(self._surfaceDescriptors)
+): { TagDescriptor<TSurfaceName> }
+	return table.clone(self._tagDescriptors)
 end
 
 function AnatomyTemplate.getPartDescriptor<TSocketName, TSurfaceName>(

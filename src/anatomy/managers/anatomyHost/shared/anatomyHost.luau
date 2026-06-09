@@ -9,7 +9,7 @@ local SocketEndpoint = require(script.Parent.Parent.Parent.Parent.components.soc
 local SocketMount = require(script.Parent.Parent.Parent.Parent.components.socketMount.shared.socketMount)
 local AnatomyInstanceTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyInstance)
 local AnatomySocketTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomySocket)
-local AnatomySurfaceTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomySurface)
+local AnatomyTaggedElementTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTaggedElement)
 local SocketBindingTypes = require(script.Parent.Parent.Parent.Parent.types.components.socketBinding)
 local Types = require(script.Parent.Parent.Parent.Parent.types.managers.anatomyHost)
 
@@ -21,19 +21,17 @@ export type AnatomyHostLayerOptions = Types.AnatomyHostLayerOptions
 export type AnatomyHostMountConfig<TSocketName, TSurfaceName> = Types.AnatomyHostMountConfig<TSocketName, TSurfaceName>
 export type AnatomyHostMountEndpoint<TSocketName, TSurfaceName> = Types.AnatomyHostMountEndpoint<TSocketName, TSurfaceName>
 export type AnatomyHostOptions<TSocketName, TSurfaceName> = Types.AnatomyHostOptions<TSocketName, TSurfaceName>
-export type AnatomyHostSurfaceQuery = Types.AnatomyHostSurfaceQuery
+export type AnatomyHostTagQuery = Types.AnatomyHostTagQuery
 export type AnatomyHostSocketQuery = Types.AnatomyHostSocketQuery
 export type AnatomyInstance<TSocketName, TSurfaceName> = AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>
-export type AnatomySurface<TSurfaceName> = AnatomySurfaceTypes.AnatomySurface<TSurfaceName>
+export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
 export type AnatomySocket<TSocketName> = AnatomySocketTypes.AnatomySocket<TSocketName>
 export type LayerId = Types.LayerId
 export type SocketBinding<TSocketName> = SocketBindingTypes.SocketBinding<TSocketName>
 export type SocketChangedCallback<TSocketName> = Types.SocketChangedCallback<TSocketName>
 export type SocketEndpoint = Types.SocketEndpoint
 export type SocketMount = Types.SocketMount
-export type SurfaceAddedCallback<TSocketName, TSurfaceName> = Types.SurfaceAddedCallback<TSocketName, TSurfaceName>
-export type SurfaceChangedCallback<TSurfaceName> = Types.SurfaceChangedCallback<TSurfaceName>
-export type SurfaceRemovedCallback<TSocketName, TSurfaceName> = Types.SurfaceRemovedCallback<TSocketName, TSurfaceName>
+export type TagChangedCallback<TagT> = Types.TagChangedCallback<TagT>
 
 local AnatomyHost = {}
 AnatomyHost.__index = AnatomyHost
@@ -74,24 +72,6 @@ local function collectSocketNames<TSocketName, TSurfaceName>(
 	return names
 end
 
-local function collectSurfaceNames<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>
-): { [TSurfaceName]: boolean }
-	local names = {}
-
-	for name in self._resolvedSurfaces do
-		names[name] = true
-	end
-
-	for _, layer in self._layerOrder do
-		for name in layer._instance:getSurfaces() do
-			names[name] = true
-		end
-	end
-
-	return names
-end
-
 local function makeSortedNameList<TName>(names: { [TName]: boolean }): { TName }
 	local count = 0
 	for _ in names do
@@ -105,6 +85,65 @@ local function makeSortedNameList<TName>(names: { [TName]: boolean }): { TName }
 
 	table.sort(nameList :: any)
 	return nameList
+end
+
+local function isCallbackSetEmpty(callbacks: { [any]: true }): boolean
+	for _ in callbacks do
+		return false
+	end
+
+	return true
+end
+
+local function areTagCallbacksEmpty(callbacks: { added: { [any]: true }, removed: { [any]: true } }): boolean
+	return isCallbackSetEmpty(callbacks.added) and isCallbackSetEmpty(callbacks.removed)
+end
+
+local function collectTaggedElements<TSocketName, TSurfaceName>(
+	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+	prefix: string,
+	query: AnatomyHostTagQuery?
+): { AnatomyTaggedElement<TSurfaceName> }
+	if query ~= nil and query.layerId ~= nil then
+		local layer = self._layers[query.layerId]
+		if layer == nil then
+			return {}
+		end
+
+		return layer._instance:getByTag(prefix)
+	end
+
+	local elements = {}
+	for _, layer in self._layerOrder do
+		for _, element in layer._instance:getByTag(prefix) do
+			table.insert(elements, element)
+		end
+	end
+
+	return elements
+end
+
+local function collectTaggedElementSet<TSocketName, TSurfaceName>(
+	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+	prefix: string
+): { [AnatomyTaggedElement<TSurfaceName>]: true }
+	local set = {}
+
+	for _, element in collectTaggedElements(self, prefix, nil) do
+		set[element] = true
+	end
+
+	return set
+end
+
+local function tagSetToList<TagT>(set: { [AnatomyTaggedElement<TagT>]: true }): { AnatomyTaggedElement<TagT> }
+	local elements = {}
+
+	for element in set do
+		table.insert(elements, element)
+	end
+
+	return elements
 end
 
 local function copyQuery(query: AnatomyHostSocketQuery?): AnatomyHostSocketQuery?
@@ -128,16 +167,6 @@ local function assertSocketNameAllowed<TSocketName, TSurfaceName>(
 	end
 end
 
-local function assertSurfaceNameAllowed<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName
-): ()
-	local guard = self._surfaceNameGuard
-	if guard ~= nil and not guard(name :: any) then
-		error(`Anatomy surface name "{name}" is not allowed by this host`, 3)
-	end
-end
-
 local function new<TSocketName, TSurfaceName>(
 	options: AnatomyHostOptions<TSocketName, TSurfaceName>?
 ): AnatomyHost<TSocketName, TSurfaceName>
@@ -145,16 +174,13 @@ local function new<TSocketName, TSurfaceName>(
 
 	self._id = if options then options.id else nil
 	self._socketNameGuard = if options then options.socketNameGuard else nil
-	self._surfaceNameGuard = if options then options.surfaceNameGuard else nil
 	self._layers = {}
 	self._layerOrder = {}
 	self._resolvedSockets = {}
 	self._socketCallbacks = {}
 	self._socketQueryCallbacks = {}
-	self._resolvedSurfaces = {}
-	self._surfaceCallbacks = {}
-	self._surfaceAddedCallbacks = {}
-	self._surfaceRemovedCallbacks = {}
+	self._tagPrefixCallbacks = {}
+	self._resolvedByPrefix = {}
 	self._bindings = weakKeySet() :: any
 	self._mounts = weakKeySet() :: any
 	self._nextLayerOrdinal = 1
@@ -180,10 +206,6 @@ function AnatomyHost.push<TSocketName, TSurfaceName>(
 		assertSocketNameAllowed(self, name)
 	end
 
-	for name in instance:getSurfaces() do
-		assertSurfaceNameAllowed(self, name)
-	end
-
 	local layer = AnatomyHostLayer.new(
 		self,
 		layerId,
@@ -198,15 +220,8 @@ function AnatomyHost.push<TSocketName, TSurfaceName>(
 	table.insert(self._layerOrder, layer)
 	sortHostLayers(self._layerOrder)
 
-	for name, surface in instance:getSurfaces() do
-		local callbacks = self._surfaceAddedCallbacks[name]
-		if callbacks ~= nil then
-			CallbackSet.fire(callbacks, surface, layer)
-		end
-	end
-
 	self:_refreshAllSockets()
-	self:_refreshAllSurfaces()
+	self:_refreshAllWatchedPrefixes()
 
 	return layer
 end
@@ -228,15 +243,8 @@ function AnatomyHost.remove<TSocketName, TSurfaceName>(
 		table.remove(self._layerOrder, index)
 	end
 
-	for name, surface in layer._instance:getSurfaces() do
-		local callbacks = self._surfaceRemovedCallbacks[name]
-		if callbacks ~= nil then
-			CallbackSet.fire(callbacks, surface, layer)
-		end
-	end
-
 	self:_refreshAllSockets()
-	self:_refreshAllSurfaces()
+	self:_refreshAllWatchedPrefixes()
 	return true
 end
 
@@ -328,70 +336,6 @@ function AnatomyHost.getSocket<TSocketName, TSurfaceName>(
 	return self:_resolveSocket(name, query)
 end
 
-function AnatomyHost.getSurfaceNames<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	query: AnatomyHostSurfaceQuery?
-): { TSurfaceName }
-	local names: { [TSurfaceName]: boolean } = {}
-
-	if query ~= nil and query.layerId ~= nil then
-		local layer = self._layers[query.layerId]
-		if layer == nil then
-			return {}
-		end
-
-		for name in layer._instance:getSurfaces() do
-			names[name] = true
-		end
-
-		return makeSortedNameList(names :: any) :: any
-	end
-
-	for name in collectSurfaceNames(self) do
-		if self:_resolveSurface(name, query) ~= nil then
-			names[name] = true
-		end
-	end
-
-	return makeSortedNameList(names :: any) :: any
-end
-
-function AnatomyHost.getSurfaces<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	query: AnatomyHostSurfaceQuery?
-): { [TSurfaceName]: AnatomySurface<TSurfaceName> }
-	local surfaces: { [TSurfaceName]: AnatomySurface<TSurfaceName> } = {}
-
-	if query ~= nil and query.layerId ~= nil then
-		local layer = self._layers[query.layerId]
-		if layer == nil then
-			return surfaces
-		end
-
-		return layer._instance:getSurfaces()
-	end
-
-	for name in collectSurfaceNames(self) do
-		local surface = self:_resolveSurface(name, query)
-		if surface == nil then
-			continue
-		end
-
-		surfaces[name] = surface
-	end
-
-	return surfaces
-end
-
-function AnatomyHost.getSurface<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName,
-	query: AnatomyHostSurfaceQuery?
-): AnatomySurface<TSurfaceName>?
-	assertSurfaceNameAllowed(self, name)
-	return self:_resolveSurface(name, query)
-end
-
 function AnatomyHost.bindSocket<TSocketName, TSurfaceName>(
 	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
 	name: TSocketName,
@@ -444,67 +388,60 @@ local function bindSocketQuery<TSocketName, TSurfaceName>(
 	end
 end
 
-function AnatomyHost.bindSurface<TSocketName, TSurfaceName>(
+function AnatomyHost.getByTag<TSocketName, TSurfaceName>(
 	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName,
-	callback: SurfaceChangedCallback<TSurfaceName>,
-	runInitially: boolean?
-): () -> ()
-	assertSurfaceNameAllowed(self, name)
-
-	local callbacks = self._surfaceCallbacks[name]
-	if callbacks == nil then
-		callbacks = CallbackSet.new()
-		self._surfaceCallbacks[name] = callbacks
+	prefix: string,
+	query: AnatomyHostTagQuery?
+): { AnatomyTaggedElement<TSurfaceName> }
+	local resolved = if query == nil then self._resolvedByPrefix[prefix] else nil
+	if resolved ~= nil then
+		return tagSetToList(resolved)
 	end
 
-	if runInitially == true then
-		callback(self:_resolveSurface(name, nil))
-	end
-
-	return CallbackSet.bind(callbacks, callback)
+	return collectTaggedElements(self, prefix, query)
 end
 
-function AnatomyHost.bindSurfaceAdded<TSocketName, TSurfaceName>(
+function AnatomyHost.bindByTag<TSocketName, TSurfaceName>(
 	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName,
-	callback: SurfaceAddedCallback<TSocketName, TSurfaceName>,
+	prefix: string,
+	onAdded: TagChangedCallback<TSurfaceName>,
+	onRemoved: TagChangedCallback<TSurfaceName>,
 	runInitially: boolean?
 ): () -> ()
-	assertSurfaceNameAllowed(self, name)
-
-	local callbacks = self._surfaceAddedCallbacks[name]
+	local callbacks = self._tagPrefixCallbacks[prefix]
 	if callbacks == nil then
-		callbacks = CallbackSet.new()
-		self._surfaceAddedCallbacks[name] = callbacks
+		callbacks = {
+			added = CallbackSet.new(),
+			removed = CallbackSet.new(),
+		}
+		self._tagPrefixCallbacks[prefix] = callbacks
+		self._resolvedByPrefix[prefix] = collectTaggedElementSet(self, prefix)
 	end
 
+	local unbindAdded = CallbackSet.bind(callbacks.added, onAdded)
+	local unbindRemoved = CallbackSet.bind(callbacks.removed, onRemoved)
+
 	if runInitially == true then
-		for _, layer in self._layerOrder do
-			local surface = layer._instance:getSurface(name)
-			if surface ~= nil then
-				callback(surface, layer)
-			end
+		for element in self._resolvedByPrefix[prefix] do
+			onAdded(element)
 		end
 	end
 
-	return CallbackSet.bind(callbacks, callback)
-end
+	local connected = true
+	return function()
+		if not connected then
+			return
+		end
 
-function AnatomyHost.bindSurfaceRemoved<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName,
-	callback: SurfaceRemovedCallback<TSocketName, TSurfaceName>
-): () -> ()
-	assertSurfaceNameAllowed(self, name)
+		connected = false
+		unbindAdded()
+		unbindRemoved()
 
-	local callbacks = self._surfaceRemovedCallbacks[name]
-	if callbacks == nil then
-		callbacks = CallbackSet.new()
-		self._surfaceRemovedCallbacks[name] = callbacks
+		if areTagCallbacksEmpty(callbacks) then
+			self._tagPrefixCallbacks[prefix] = nil
+			self._resolvedByPrefix[prefix] = nil
+		end
 	end
-
-	return CallbackSet.bind(callbacks, callback)
 end
 
 function AnatomyHost.socket<TSocketName, TSurfaceName>(
@@ -582,42 +519,6 @@ function AnatomyHost._resolveSocket<TSocketName, TSurfaceName>(
 	return resolved
 end
 
-function AnatomyHost._resolveSurface<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName,
-	query: AnatomyHostSurfaceQuery?
-): AnatomySurface<TSurfaceName>?
-	if query ~= nil and query.layerId ~= nil then
-		local layer = self._layers[query.layerId]
-		if layer == nil then
-			return nil
-		end
-
-		return layer._instance:getSurface(name)
-	end
-
-	local resolved: AnatomySurface<TSurfaceName>? = nil
-	local includeOverrides = query == nil or query.includeOverrides ~= false
-
-	for _, layer in self._layerOrder do
-		local surface = layer._instance:getSurface(name)
-		if surface == nil then
-			continue
-		end
-
-		if resolved == nil then
-			resolved = surface
-			continue
-		end
-
-		if includeOverrides and layer._allowSocketOverrides then
-			resolved = surface
-		end
-	end
-
-	return resolved
-end
-
 function AnatomyHost._refreshSocket<TSocketName, TSurfaceName>(
 	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
 	name: TSocketName
@@ -633,24 +534,6 @@ function AnatomyHost._refreshSocket<TSocketName, TSurfaceName>(
 	local callbacks = self._socketCallbacks[name]
 	if callbacks ~= nil then
 		CallbackSet.fire(callbacks, newSocket)
-	end
-end
-
-function AnatomyHost._refreshSurface<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName
-): ()
-	local oldSurface = self._resolvedSurfaces[name]
-	local newSurface = self:_resolveSurface(name, nil)
-	if oldSurface == newSurface then
-		return
-	end
-
-	self._resolvedSurfaces[name] = newSurface
-
-	local callbacks = self._surfaceCallbacks[name]
-	if callbacks ~= nil then
-		CallbackSet.fire(callbacks, newSurface)
 	end
 end
 
@@ -670,11 +553,41 @@ function AnatomyHost._refreshAllSockets<TSocketName, TSurfaceName>(
 	end
 end
 
-function AnatomyHost._refreshAllSurfaces<TSocketName, TSurfaceName>(
+function AnatomyHost._refreshTagPrefix<TSocketName, TSurfaceName>(
+	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+	prefix: string
+): ()
+	local oldSet = self._resolvedByPrefix[prefix]
+	if oldSet == nil then
+		return
+	end
+
+	local newSet = collectTaggedElementSet(self, prefix)
+	self._resolvedByPrefix[prefix] = newSet
+
+	local callbacks = self._tagPrefixCallbacks[prefix]
+	if callbacks == nil then
+		return
+	end
+
+	for element in newSet do
+		if oldSet[element] ~= true then
+			CallbackSet.fire(callbacks.added, element)
+		end
+	end
+
+	for element in oldSet do
+		if newSet[element] ~= true then
+			CallbackSet.fire(callbacks.removed, element)
+		end
+	end
+end
+
+function AnatomyHost._refreshAllWatchedPrefixes<TSocketName, TSurfaceName>(
 	self: AnatomyHostImpl<TSocketName, TSurfaceName>
 ): ()
-	for name in collectSurfaceNames(self) do
-		self:_refreshSurface(name)
+	for prefix in self._tagPrefixCallbacks do
+		self:_refreshTagPrefix(prefix)
 	end
 end
 
@@ -739,20 +652,11 @@ function AnatomyHost.deconstruct<TSocketName, TSurfaceName>(self: AnatomyHostImp
 	end
 	table.clear(self._socketCallbacks)
 
-	for _, callbacks in self._surfaceCallbacks do
-		table.clear(callbacks)
+	for _, callbacks in self._tagPrefixCallbacks do
+		table.clear(callbacks.added)
+		table.clear(callbacks.removed)
 	end
-	table.clear(self._surfaceCallbacks)
-
-	for _, callbacks in self._surfaceAddedCallbacks do
-		table.clear(callbacks)
-	end
-	table.clear(self._surfaceAddedCallbacks)
-
-	for _, callbacks in self._surfaceRemovedCallbacks do
-		table.clear(callbacks)
-	end
-	table.clear(self._surfaceRemovedCallbacks)
+	table.clear(self._tagPrefixCallbacks)
 
 	for _, layer in self._layerOrder do
 		layer._destroyed = true
@@ -760,7 +664,7 @@ function AnatomyHost.deconstruct<TSocketName, TSurfaceName>(self: AnatomyHostImp
 	table.clear(self._layerOrder)
 	table.clear(self._layers)
 	table.clear(self._resolvedSockets)
-	table.clear(self._resolvedSurfaces)
+	table.clear(self._resolvedByPrefix)
 end
 
 

@@ -20,7 +20,7 @@ export type AnatomyPath = DefTypes.AnatomyPath
 export type DescriptorMetadata = DefTypes.DescriptorMetadata
 export type NameGuard<TName> = DefTypes.NameGuard<TName>
 export type SocketDescriptor<TSocketName> = DefTypes.SocketDescriptor<TSocketName>
-export type SurfaceDescriptor<TSurfaceName> = DefTypes.SurfaceDescriptor<TSurfaceName>
+export type TagDescriptor<TagT> = DefTypes.TagDescriptor<TagT>
 export type PartDescriptor = DefTypes.PartDescriptor
 export type RecognizeOptions<TSocketName, TSurfaceName> = DefTypes.RecognizeOptions<TSocketName, TSurfaceName>
 export type RecognizeConfig<TSocketName, TSurfaceName> = DefTypes.RecognizeConfig<TSocketName, TSurfaceName>
@@ -31,7 +31,7 @@ export type InstancePolicy = DefTypes.InstancePolicy
 --------------------------------------------------------------------------------
 
 export type AnatomySocket<TSocketName> = ComponentTypes.AnatomySocket<TSocketName>
-export type AnatomySurface<TSurfaceName> = ComponentTypes.AnatomySurface<TSurfaceName>
+export type AnatomyTaggedElement<TagT> = ComponentTypes.AnatomyTaggedElement<TagT>
 export type AnatomyPart = ComponentTypes.AnatomyPart
 export type AnatomyTemplate<TSocketName, TSurfaceName> = ComponentTypes.AnatomyTemplate<TSocketName, TSurfaceName>
 export type AnatomyInstance<TSocketName, TSurfaceName> = ComponentTypes.AnatomyInstance<TSocketName, TSurfaceName>
@@ -52,7 +52,7 @@ export type AnatomyHostOptions<TSocketName, TSurfaceName> = ManagerTypes.Anatomy
 export type AnatomyHostLayer<TSocketName, TSurfaceName> = ManagerTypes.AnatomyHostLayer<TSocketName, TSurfaceName>
 export type AnatomyHostLayerOptions = ManagerTypes.AnatomyHostLayerOptions
 export type AnatomyHostSocketQuery = ManagerTypes.AnatomyHostSocketQuery
-export type AnatomyHostSurfaceQuery = ManagerTypes.AnatomyHostSurfaceQuery
+export type AnatomyHostTagQuery = ManagerTypes.AnatomyHostTagQuery
 export type AnatomyHostSocketAddress<TSocketName> = ManagerTypes.AnatomyHostSocketAddress<TSocketName>
 export type AnatomyInstanceSocketAddress<TSocketName, TSurfaceName> =
 	ManagerTypes.AnatomyInstanceSocketAddress<TSocketName, TSurfaceName>
@@ -60,9 +60,6 @@ export type AnatomyHostMountEndpoint<TSocketName, TSurfaceName> =
 	ManagerTypes.AnatomyHostMountEndpoint<TSocketName, TSurfaceName>
 export type AnatomyHostMountConfig<TSocketName, TSurfaceName> =
 	ManagerTypes.AnatomyHostMountConfig<TSocketName, TSurfaceName>
-export type SurfaceChangedCallback<TSurfaceName> = ManagerTypes.SurfaceChangedCallback<TSurfaceName>
-export type SurfaceAddedCallback<TSocketName, TSurfaceName> = ManagerTypes.SurfaceAddedCallback<TSocketName, TSurfaceName>
-export type SurfaceRemovedCallback<TSocketName, TSurfaceName> =
-	ManagerTypes.SurfaceRemovedCallback<TSocketName, TSurfaceName>
+export type TagChangedCallback<TagT> = ManagerTypes.TagChangedCallback<TagT>
 
 return {}

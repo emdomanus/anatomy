@@ -39,10 +39,10 @@ export type SocketDescriptor<TSocketName> = {
 	metadata: DescriptorMetadata?,
 }
 
-export type SurfaceDescriptor<TSurfaceName> = {
-	name: TSurfaceName,
-	paths: { AnatomyPath },
-	metadata: DescriptorMetadata?,
+export type TagDescriptor<TagT> = {
+	path: AnatomyPath,
+	tags: { [TagT]: true },
+	prefixes: { [string]: true },
 }
 
 export type PartDescriptor = {
@@ -67,10 +67,12 @@ export type RecognizeOptions<TSocketName, TSurfaceName> = {
 	category: AnatomyCategory?,
 
 	socketAttribute: string?,
-	surfaceAttribute: string?,
 	partAttribute: string?,
+	tagsAttribute: string?,
+	tagDelimiter: string?,
+	tagPathDelimiter: string?,
 	socketNameGuard: NameGuard<TSocketName>?,
-	surfaceNameGuard: NameGuard<TSurfaceName>?,
+	tagGuard: ((path: string) -> TSurfaceName?)?,
 
 	instancePolicy: InstancePolicy?,
 

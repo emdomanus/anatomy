@@ -13,7 +13,7 @@ export type PartDescriptor = DefTypes.PartDescriptor
 export type PartName = DefTypes.PartName
 export type RecognizeConfig<TSocketName, TSurfaceName> = DefTypes.RecognizeConfig<TSocketName, TSurfaceName>
 export type SocketDescriptor<TSocketName> = DefTypes.SocketDescriptor<TSocketName>
-export type SurfaceDescriptor<TSurfaceName> = DefTypes.SurfaceDescriptor<TSurfaceName>
+export type TagDescriptor<TagT> = DefTypes.TagDescriptor<TagT>
 
 export type AnatomyTemplate<TSocketName, TSurfaceName> = {
 	getId: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> AnatomyId?,
@@ -27,11 +27,7 @@ export type AnatomyTemplate<TSocketName, TSurfaceName> = {
 		name: TSocketName
 	) -> SocketDescriptor<TSocketName>?,
 	getSocketDescriptors: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> { [TSocketName]: SocketDescriptor<TSocketName> },
-	getSurfaceDescriptor: (
-		self: AnatomyTemplate<TSocketName, TSurfaceName>,
-		name: TSurfaceName
-	) -> SurfaceDescriptor<TSurfaceName>?,
-	getSurfaceDescriptors: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> { [TSurfaceName]: SurfaceDescriptor<TSurfaceName> },
+	getTagDescriptors: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> { TagDescriptor<TSurfaceName> },
 	getPartDescriptor: (self: AnatomyTemplate<TSocketName, TSurfaceName>, name: PartName) -> PartDescriptor?,
 	getPartDescriptors: (self: AnatomyTemplate<TSocketName, TSurfaceName>) -> { [PartName]: PartDescriptor },
 
@@ -54,7 +50,7 @@ export type AnatomyTemplateImpl<TSocketName, TSurfaceName> = AnatomyTemplate<TSo
 	_metadata: DescriptorMetadata?,
 
 	_socketDescriptors: { [TSocketName]: SocketDescriptor<TSocketName> },
-	_surfaceDescriptors: { [TSurfaceName]: SurfaceDescriptor<TSurfaceName> },
+	_tagDescriptors: { TagDescriptor<TSurfaceName> },
 	_partDescriptors: { [PartName]: PartDescriptor },
 }
 

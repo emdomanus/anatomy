@@ -4,7 +4,7 @@
 
 local AnatomyPartTypes = require(script.Parent.anatomyPart)
 local AnatomySocketTypes = require(script.Parent.anatomySocket)
-local AnatomySurfaceTypes = require(script.Parent.anatomySurface)
+local AnatomyTaggedElementTypes = require(script.Parent.anatomyTaggedElement)
 local DefTypes = require(script.Parent.Parent.def)
 
 export type AnatomyCategory = DefTypes.AnatomyCategory
@@ -17,7 +17,7 @@ export type InstancePolicy = DefTypes.InstancePolicy
 export type PartName = DefTypes.PartName
 export type PartDescriptor = DefTypes.PartDescriptor
 export type SocketDescriptor<TSocketName> = DefTypes.SocketDescriptor<TSocketName>
-export type SurfaceDescriptor<TSurfaceName> = DefTypes.SurfaceDescriptor<TSurfaceName>
+export type TagDescriptor<TagT> = DefTypes.TagDescriptor<TagT>
 
 export type AnatomyInstance<TSocketName, TSurfaceName> = {
 	getId: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> AnatomyId?,
@@ -32,15 +32,12 @@ export type AnatomyInstance<TSocketName, TSurfaceName> = {
 		name: TSocketName
 	) -> AnatomySocketTypes.AnatomySocket<TSocketName>?,
 	getSockets: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> { [TSocketName]: AnatomySocketTypes.AnatomySocket<TSocketName> },
-	getSurface: (
-		self: AnatomyInstance<TSocketName, TSurfaceName>,
-		name: TSurfaceName
-	) -> AnatomySurfaceTypes.AnatomySurface<TSurfaceName>?,
-	getSurfaces: (
-		self: AnatomyInstance<TSocketName, TSurfaceName>
-	) -> { [TSurfaceName]: AnatomySurfaceTypes.AnatomySurface<TSurfaceName> },
 	getPart: (self: AnatomyInstance<TSocketName, TSurfaceName>, name: PartName) -> AnatomyPart?,
 	getParts: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> { [PartName]: AnatomyPart },
+	getByTag: (
+		self: AnatomyInstance<TSocketName, TSurfaceName>,
+		prefix: string
+	) -> { AnatomyTaggedElementTypes.AnatomyTaggedElement<TSurfaceName> },
 
 	setParent: (self: AnatomyInstance<TSocketName, TSurfaceName>, parent: Instance?) -> (),
 	applyInstancePolicy: (self: AnatomyInstance<TSocketName, TSurfaceName>, policy: InstancePolicy) -> (),
@@ -57,8 +54,9 @@ export type AnatomyInstanceImpl<TSocketName, TSurfaceName> = AnatomyInstance<TSo
 	_ownsRoot: boolean,
 
 	_sockets: { [TSocketName]: AnatomySocketTypes.AnatomySocketImpl<TSocketName> },
-	_surfaces: { [TSurfaceName]: AnatomySurfaceTypes.AnatomySurfaceImpl<TSurfaceName> },
 	_parts: { [PartName]: AnatomyPartImpl },
+	_taggedElements: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TSurfaceName> },
+	_tagPrefixIndex: { [string]: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TSurfaceName> } },
 	_destroyed: boolean,
 
 	_resolvePath: (self: AnatomyInstanceImpl<TSocketName, TSurfaceName>, path: DefTypes.AnatomyPath) -> Instance?,
@@ -66,11 +64,11 @@ export type AnatomyInstanceImpl<TSocketName, TSurfaceName> = AnatomyInstance<TSo
 		self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
 		descriptor: DefTypes.SocketDescriptor<TSocketName>
 	) -> AnatomySocketTypes.AnatomySocketImpl<TSocketName>,
-	_buildSurface: (
-		self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
-		descriptor: DefTypes.SurfaceDescriptor<TSurfaceName>
-	) -> AnatomySurfaceTypes.AnatomySurfaceImpl<TSurfaceName>,
 	_buildPart: (self: AnatomyInstanceImpl<TSocketName, TSurfaceName>, descriptor: DefTypes.PartDescriptor) -> AnatomyPartImpl,
+	_buildTaggedElement: (
+		self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
+		descriptor: DefTypes.TagDescriptor<TSurfaceName>
+	) -> AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TSurfaceName>,
 }
 
 return {}

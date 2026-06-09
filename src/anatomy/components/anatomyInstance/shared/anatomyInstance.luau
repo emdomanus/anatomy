@@ -4,10 +4,10 @@
 
 local AnatomyPart = require(script.Parent.Parent.Parent.anatomyPart.shared.anatomyPart)
 local AnatomySocket = require(script.Parent.Parent.Parent.anatomySocket.shared.anatomySocket)
-local AnatomySurface = require(script.Parent.Parent.Parent.anatomySurface.shared.anatomySurface)
+local AnatomyTaggedElement = require(script.Parent.Parent.Parent.anatomyTaggedElement.shared.anatomyTaggedElement)
 local Path = require(script.Parent.Parent.Parent.Parent.utils.path)
 local AnatomySocketTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomySocket)
-local AnatomySurfaceTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomySurface)
+local AnatomyTaggedElementTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTaggedElement)
 local AnatomyTemplateTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTemplate)
 local DefTypes = require(script.Parent.Parent.Parent.Parent.types.def)
 local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatomyInstance)
@@ -19,13 +19,13 @@ export type AnatomyInstanceImpl<TSocketName, TSurfaceName> = Types.AnatomyInstan
 export type AnatomyPart = Types.AnatomyPart
 export type AnatomyRole = Types.AnatomyRole
 export type AnatomySocket<TSocketName> = AnatomySocketTypes.AnatomySocket<TSocketName>
-export type AnatomySurface<TSurfaceName> = AnatomySurfaceTypes.AnatomySurface<TSurfaceName>
+export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
 export type DescriptorMetadata = Types.DescriptorMetadata
 export type InstancePolicy = Types.InstancePolicy
 export type PartName = Types.PartName
 export type PartDescriptor = Types.PartDescriptor
 export type SocketDescriptor<TSocketName> = Types.SocketDescriptor<TSocketName>
-export type SurfaceDescriptor<TSurfaceName> = Types.SurfaceDescriptor<TSurfaceName>
+export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
 export type AnatomyPath = DefTypes.AnatomyPath
 export type AnatomyTemplate<TSocketName, TSurfaceName> = AnatomyTemplateTypes.AnatomyTemplate<TSocketName, TSurfaceName>
 
@@ -48,6 +48,22 @@ local function forRootAndDescendants(root: Instance, callback: (Instance) -> ())
 	end
 end
 
+local function addTaggedElementToIndex<TagT>(
+	tagPrefixIndex: { [string]: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT> } },
+	element: AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT>,
+	prefixes: { [string]: true }
+): ()
+	for prefix in prefixes do
+		local elements = tagPrefixIndex[prefix]
+		if elements == nil then
+			elements = {}
+			tagPrefixIndex[prefix] = elements
+		end
+
+		table.insert(elements, element)
+	end
+end
+
 function AnatomyInstance.new<TSocketName, TSurfaceName>(
 	template: AnatomyTemplate<TSocketName, TSurfaceName>,
 	root: Instance,
@@ -64,20 +80,23 @@ function AnatomyInstance.new<TSocketName, TSurfaceName>(
 	self._ownsRoot = ownsRoot == true
 
 	self._sockets = {}
-	self._surfaces = {}
 	self._parts = {}
+	self._taggedElements = {}
+	self._tagPrefixIndex = {}
 	self._destroyed = false
 
 	for name, descriptor in template:getSocketDescriptors() do
 		self._sockets[name] = self:_buildSocket(descriptor)
 	end
 
-	for name, descriptor in template:getSurfaceDescriptors() do
-		self._surfaces[name] = self:_buildSurface(descriptor)
-	end
-
 	for name, descriptor in template:getPartDescriptors() do
 		self._parts[name] = self:_buildPart(descriptor)
+	end
+
+	for _, descriptor in template:getTagDescriptors() do
+		local element = self:_buildTaggedElement(descriptor)
+		table.insert(self._taggedElements, element)
+		addTaggedElementToIndex(self._tagPrefixIndex, element, descriptor.prefixes)
 	end
 
 	local config = (template :: any)._config
@@ -129,19 +148,6 @@ function AnatomyInstance.getSockets<TSocketName, TSurfaceName>(
 	return table.clone(self._sockets) :: any
 end
 
-function AnatomyInstance.getSurface<TSocketName, TSurfaceName>(
-	self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
-	name: TSurfaceName
-): AnatomySurface<TSurfaceName>?
-	return self._surfaces[name]
-end
-
-function AnatomyInstance.getSurfaces<TSocketName, TSurfaceName>(
-	self: AnatomyInstanceImpl<TSocketName, TSurfaceName>
-): { [TSurfaceName]: AnatomySurface<TSurfaceName> }
-	return table.clone(self._surfaces) :: any
-end
-
 function AnatomyInstance.getPart<TSocketName, TSurfaceName>(
 	self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
 	name: PartName
@@ -153,6 +159,18 @@ function AnatomyInstance.getParts<TSocketName, TSurfaceName>(
 	self: AnatomyInstanceImpl<TSocketName, TSurfaceName>
 ): { [PartName]: AnatomyPart }
 	return table.clone(self._parts) :: any
+end
+
+function AnatomyInstance.getByTag<TSocketName, TSurfaceName>(
+	self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
+	prefix: string
+): { AnatomyTaggedElement<TSurfaceName> }
+	local elements = self._tagPrefixIndex[prefix]
+	if elements == nil then
+		return {}
+	end
+
+	return table.clone(elements) :: any
 end
 
 function AnatomyInstance.setParent<TSocketName, TSurfaceName>(
@@ -224,22 +242,6 @@ function AnatomyInstance._buildSocket<TSocketName, TSurfaceName>(
 	return AnatomySocket.fromDescriptor(self, descriptor, target :: Attachment) :: any
 end
 
-function AnatomyInstance._buildSurface<TSocketName, TSurfaceName>(
-	self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
-	descriptor: SurfaceDescriptor<TSurfaceName>
-): AnatomySurfaceTypes.AnatomySurfaceImpl<TSurfaceName>
-	local instances = table.create(#descriptor.paths)
-	for _, path in descriptor.paths do
-		local instance = self:_resolvePath(path)
-		if instance == nil then
-			error(`Anatomy surface "{descriptor.name}" path did not resolve under {self._root:GetFullName()}`, 2)
-		end
-		table.insert(instances, instance)
-	end
-
-	return AnatomySurface.fromDescriptor(self, descriptor, instances) :: any
-end
-
 function AnatomyInstance._buildPart(
 	self: AnatomyInstanceImpl<any, any>,
 	descriptor: PartDescriptor
@@ -250,6 +252,18 @@ function AnatomyInstance._buildPart(
 	end
 
 	return AnatomyPart.fromDescriptor(self, descriptor, instance) :: any
+end
+
+function AnatomyInstance._buildTaggedElement<TSocketName, TSurfaceName>(
+	self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
+	descriptor: TagDescriptor<TSurfaceName>
+): AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TSurfaceName>
+	local instance = self:_resolvePath(descriptor.path)
+	if instance == nil then
+		error(`Anatomy tag path did not resolve under {self._root:GetFullName()}`, 2)
+	end
+
+	return AnatomyTaggedElement.fromDescriptor(self, descriptor, instance) :: any
 end
 
 function AnatomyInstance.deconstruct<TSocketName, TSurfaceName>(self: AnatomyInstanceImpl<TSocketName, TSurfaceName>): ()
@@ -263,14 +277,15 @@ function AnatomyInstance.deconstruct<TSocketName, TSurfaceName>(self: AnatomyIns
 		socket:deconstruct()
 		self._sockets[name] = nil
 	end
-	for name, surface in self._surfaces do
-		surface:deconstruct()
-		self._surfaces[name] = nil
-	end
 	for name, part in self._parts do
 		part:deconstruct()
 		self._parts[name] = nil
 	end
+	for index, element in self._taggedElements do
+		element:deconstruct()
+		self._taggedElements[index] = nil
+	end
+	table.clear(self._tagPrefixIndex)
 
 	if self._ownsRoot then
 		self._root:Destroy()
