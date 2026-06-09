@@ -9,8 +9,6 @@ export type AnatomyCategory = DefTypes.AnatomyCategory
 export type AnatomyId = DefTypes.AnatomyId
 export type AnatomyRole = DefTypes.AnatomyRole
 export type DescriptorMetadata = DefTypes.DescriptorMetadata
-export type PartDescriptor = DefTypes.PartDescriptor
-export type PartName = DefTypes.PartName
 export type RecognizeConfig<SocketT, TagT> = DefTypes.RecognizeConfig<SocketT, TagT>
 export type SocketDescriptor<SocketT> = DefTypes.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = DefTypes.TagDescriptor<TagT>
@@ -28,8 +26,6 @@ export type AnatomyTemplate<SocketT, TagT> = {
 	) -> SocketDescriptor<SocketT>?,
 	getSocketDescriptors: (self: AnatomyTemplate<SocketT, TagT>) -> { [SocketT]: SocketDescriptor<SocketT> },
 	getTagDescriptors: (self: AnatomyTemplate<SocketT, TagT>) -> { TagDescriptor<TagT> },
-	getPartDescriptor: (self: AnatomyTemplate<SocketT, TagT>, name: PartName) -> PartDescriptor?,
-	getPartDescriptors: (self: AnatomyTemplate<SocketT, TagT>) -> { [PartName]: PartDescriptor },
 
 	instantiate: (
 		self: AnatomyTemplate<SocketT, TagT>,
@@ -51,7 +47,6 @@ export type AnatomyTemplateImpl<SocketT, TagT> = AnatomyTemplate<SocketT, TagT> 
 
 	_socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> },
 	_tagDescriptors: { TagDescriptor<TagT> },
-	_partDescriptors: { [PartName]: PartDescriptor },
 }
 
 return {}

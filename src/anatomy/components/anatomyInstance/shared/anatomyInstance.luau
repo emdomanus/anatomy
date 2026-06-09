@@ -2,7 +2,6 @@
 --!optimize 2
 --!native
 
-local AnatomyPart = require(script.Parent.Parent.Parent.anatomyPart.shared.anatomyPart)
 local AnatomySocket = require(script.Parent.Parent.Parent.anatomySocket.shared.anatomySocket)
 local AnatomyTaggedElement = require(script.Parent.Parent.Parent.anatomyTaggedElement.shared.anatomyTaggedElement)
 local Path = require(script.Parent.Parent.Parent.Parent.utils.path)
@@ -16,14 +15,11 @@ export type AnatomyCategory = Types.AnatomyCategory
 export type AnatomyId = Types.AnatomyId
 export type AnatomyInstance<SocketT, TagT> = Types.AnatomyInstance<SocketT, TagT>
 export type AnatomyInstanceImpl<SocketT, TagT> = Types.AnatomyInstanceImpl<SocketT, TagT>
-export type AnatomyPart = Types.AnatomyPart
 export type AnatomyRole = Types.AnatomyRole
 export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
 export type DescriptorMetadata = Types.DescriptorMetadata
 export type InstancePolicy = Types.InstancePolicy
-export type PartName = Types.PartName
-export type PartDescriptor = Types.PartDescriptor
 export type SocketDescriptor<SocketT> = Types.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
 export type AnatomyPath = DefTypes.AnatomyPath
@@ -80,17 +76,12 @@ function AnatomyInstance.new<SocketT, TagT>(
 	self._ownsRoot = ownsRoot == true
 
 	self._sockets = {}
-	self._parts = {}
 	self._taggedElements = {}
 	self._tagPrefixIndex = {}
 	self._destroyed = false
 
 	for name, descriptor in template:getSocketDescriptors() do
 		self._sockets[name] = self:_buildSocket(descriptor)
-	end
-
-	for name, descriptor in template:getPartDescriptors() do
-		self._parts[name] = self:_buildPart(descriptor)
 	end
 
 	for _, descriptor in template:getTagDescriptors() do
@@ -146,19 +137,6 @@ function AnatomyInstance.getSockets<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>
 ): { [SocketT]: AnatomySocket<SocketT> }
 	return table.clone(self._sockets) :: any
-end
-
-function AnatomyInstance.getPart<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>,
-	name: PartName
-): AnatomyPart?
-	return self._parts[name]
-end
-
-function AnatomyInstance.getParts<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>
-): { [PartName]: AnatomyPart }
-	return table.clone(self._parts) :: any
 end
 
 function AnatomyInstance.getByTag<SocketT, TagT>(
@@ -242,18 +220,6 @@ function AnatomyInstance._buildSocket<SocketT, TagT>(
 	return AnatomySocket.fromDescriptor(self, descriptor, target :: Attachment) :: any
 end
 
-function AnatomyInstance._buildPart(
-	self: AnatomyInstanceImpl<any, any>,
-	descriptor: PartDescriptor
-): Types.AnatomyPartImpl
-	local instance = self:_resolvePath(descriptor.path)
-	if instance == nil then
-		error(`Anatomy part "{descriptor.name}" path did not resolve under {self._root:GetFullName()}`, 2)
-	end
-
-	return AnatomyPart.fromDescriptor(self, descriptor, instance) :: any
-end
-
 function AnatomyInstance._buildTaggedElement<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>,
 	descriptor: TagDescriptor<TagT>
@@ -276,10 +242,6 @@ function AnatomyInstance.deconstruct<SocketT, TagT>(self: AnatomyInstanceImpl<So
 	for name, socket in self._sockets do
 		socket:deconstruct()
 		self._sockets[name] = nil
-	end
-	for name, part in self._parts do
-		part:deconstruct()
-		self._parts[name] = nil
 	end
 	for index, element in self._taggedElements do
 		element:deconstruct()

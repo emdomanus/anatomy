@@ -14,8 +14,6 @@ export type AnatomyRole = Types.AnatomyRole
 export type AnatomyTemplate<SocketT, TagT> = Types.AnatomyTemplate<SocketT, TagT>
 export type AnatomyTemplateImpl<SocketT, TagT> = Types.AnatomyTemplateImpl<SocketT, TagT>
 export type DescriptorMetadata = Types.DescriptorMetadata
-export type PartDescriptor = Types.PartDescriptor
-export type PartName = Types.PartName
 export type RecognizeConfig<SocketT, TagT> = Types.RecognizeConfig<SocketT, TagT>
 export type SocketDescriptor<SocketT> = Types.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
@@ -142,14 +140,12 @@ function AnatomyTemplate.recognize<SocketT, TagT>(
 	config: RecognizeConfig<SocketT, TagT>
 ): AnatomyTemplate<SocketT, TagT>
 	local socketAttribute = getAttributeName(config, "socketAttribute")
-	local partAttribute = getAttributeName(config, "partAttribute")
 	local tagsAttribute = getAttributeName(config, "tagsAttribute")
 	local tagDelimiter = if config.tagDelimiter ~= nil and config.tagDelimiter ~= "" then config.tagDelimiter else ";"
 	local tagPathDelimiter = if config.tagPathDelimiter ~= nil and config.tagPathDelimiter ~= "" then config.tagPathDelimiter else "."
 
 	local socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> } = {}
 	local tagDescriptors: { TagDescriptor<TagT> } = {}
-	local partDescriptors: { [PartName]: PartDescriptor } = {}
 
 	for _, instance in makeSearchList(root) do
 		if socketAttribute ~= nil then
@@ -185,30 +181,15 @@ function AnatomyTemplate.recognize<SocketT, TagT>(
 				})
 			end
 		end
-
-		if partAttribute ~= nil then
-			local partName = readNamedAttribute(instance, partAttribute, "part")
-			if partName ~= nil then
-				if partDescriptors[partName] ~= nil then
-					error(`Duplicate anatomy part "{partName}" in {root:GetFullName()}`, 2)
-				end
-
-				partDescriptors[partName] = {
-					name = partName,
-					path = Path.fromRoot(root, instance),
-				}
-			end
-		end
 	end
 
-	return AnatomyTemplate.new(root, config, socketDescriptors, partDescriptors, tagDescriptors)
+	return AnatomyTemplate.new(root, config, socketDescriptors, tagDescriptors)
 end
 
 function AnatomyTemplate.new<SocketT, TagT>(
 	source: Instance,
 	config: RecognizeConfig<SocketT, TagT>,
 	socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> }?,
-	partDescriptors: { [PartName]: PartDescriptor }?,
 	tagDescriptors: { TagDescriptor<TagT> }?
 ): AnatomyTemplate<SocketT, TagT>
 	local self: AnatomyTemplateImpl<SocketT, TagT> = setmetatable({}, AnatomyTemplate) :: any
@@ -221,7 +202,6 @@ function AnatomyTemplate.new<SocketT, TagT>(
 	self._metadata = config.metadata
 	self._socketDescriptors = socketDescriptors or {}
 	self._tagDescriptors = tagDescriptors or {}
-	self._partDescriptors = partDescriptors or {}
 
 	return self
 end
@@ -267,19 +247,6 @@ function AnatomyTemplate.getTagDescriptors<SocketT, TagT>(
 	self: AnatomyTemplateImpl<SocketT, TagT>
 ): { TagDescriptor<TagT> }
 	return table.clone(self._tagDescriptors)
-end
-
-function AnatomyTemplate.getPartDescriptor<SocketT, TagT>(
-	self: AnatomyTemplateImpl<SocketT, TagT>,
-	name: PartName
-): PartDescriptor?
-	return self._partDescriptors[name]
-end
-
-function AnatomyTemplate.getPartDescriptors<SocketT, TagT>(
-	self: AnatomyTemplateImpl<SocketT, TagT>
-): { [PartName]: PartDescriptor }
-	return table.clone(self._partDescriptors)
 end
 
 function AnatomyTemplate.instantiate<SocketT, TagT>(

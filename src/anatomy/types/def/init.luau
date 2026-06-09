@@ -11,8 +11,6 @@ export type AnatomyCategory = string
 export type AnatomyId = string
 export type LayerId = string
 
-export type PartName = string
-
 --------------------------------------------------------------------------------
 -- Paths
 --------------------------------------------------------------------------------
@@ -45,12 +43,6 @@ export type TagDescriptor<TagT> = {
 	prefixes: { [string]: true },
 }
 
-export type PartDescriptor = {
-	name: PartName,
-	path: AnatomyPath,
-	metadata: DescriptorMetadata?,
-}
-
 export type InstancePolicy = {
 	canCollide: boolean?,
 	canQuery: boolean?,
@@ -67,7 +59,6 @@ export type RecognizeOptions<SocketT, TagT> = {
 	category: AnatomyCategory?,
 
 	socketAttribute: string?,
-	partAttribute: string?,
 	tagsAttribute: string?,
 	tagDelimiter: string?,
 	tagPathDelimiter: string?,

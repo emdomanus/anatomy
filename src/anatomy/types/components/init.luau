@@ -3,7 +3,6 @@
 --!native
 
 local AnatomyInstanceTypes = require(script.anatomyInstance)
-local AnatomyPartTypes = require(script.anatomyPart)
 local AnatomySocketTypes = require(script.anatomySocket)
 local AnatomyTaggedElementTypes = require(script.anatomyTaggedElement)
 local AnatomyTemplateTypes = require(script.anatomyTemplate)
@@ -13,7 +12,6 @@ local SocketMountTypes = require(script.socketMount)
 
 export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
-export type AnatomyPart = AnatomyPartTypes.AnatomyPart
 export type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
 export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>
 export type SocketBinding<SocketT> = SocketBindingTypes.SocketBinding<SocketT>

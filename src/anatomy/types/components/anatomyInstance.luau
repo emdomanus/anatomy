@@ -2,20 +2,15 @@
 --!optimize 2
 --!native
 
-local AnatomyPartTypes = require(script.Parent.anatomyPart)
 local AnatomySocketTypes = require(script.Parent.anatomySocket)
 local AnatomyTaggedElementTypes = require(script.Parent.anatomyTaggedElement)
 local DefTypes = require(script.Parent.Parent.def)
 
 export type AnatomyCategory = DefTypes.AnatomyCategory
 export type AnatomyId = DefTypes.AnatomyId
-export type AnatomyPart = AnatomyPartTypes.AnatomyPart
-export type AnatomyPartImpl = AnatomyPartTypes.AnatomyPartImpl
 export type AnatomyRole = DefTypes.AnatomyRole
 export type DescriptorMetadata = DefTypes.DescriptorMetadata
 export type InstancePolicy = DefTypes.InstancePolicy
-export type PartName = DefTypes.PartName
-export type PartDescriptor = DefTypes.PartDescriptor
 export type SocketDescriptor<SocketT> = DefTypes.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = DefTypes.TagDescriptor<TagT>
 
@@ -32,8 +27,6 @@ export type AnatomyInstance<SocketT, TagT> = {
 		name: SocketT
 	) -> AnatomySocketTypes.AnatomySocket<SocketT>?,
 	getSockets: (self: AnatomyInstance<SocketT, TagT>) -> { [SocketT]: AnatomySocketTypes.AnatomySocket<SocketT> },
-	getPart: (self: AnatomyInstance<SocketT, TagT>, name: PartName) -> AnatomyPart?,
-	getParts: (self: AnatomyInstance<SocketT, TagT>) -> { [PartName]: AnatomyPart },
 	getByTag: (
 		self: AnatomyInstance<SocketT, TagT>,
 		prefix: string
@@ -54,7 +47,6 @@ export type AnatomyInstanceImpl<SocketT, TagT> = AnatomyInstance<SocketT, TagT> 
 	_ownsRoot: boolean,
 
 	_sockets: { [SocketT]: AnatomySocketTypes.AnatomySocketImpl<SocketT> },
-	_parts: { [PartName]: AnatomyPartImpl },
 	_taggedElements: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT> },
 	_tagPrefixIndex: { [string]: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT> } },
 	_destroyed: boolean,
@@ -64,7 +56,6 @@ export type AnatomyInstanceImpl<SocketT, TagT> = AnatomyInstance<SocketT, TagT> 
 		self: AnatomyInstanceImpl<SocketT, TagT>,
 		descriptor: DefTypes.SocketDescriptor<SocketT>
 	) -> AnatomySocketTypes.AnatomySocketImpl<SocketT>,
-	_buildPart: (self: AnatomyInstanceImpl<SocketT, TagT>, descriptor: DefTypes.PartDescriptor) -> AnatomyPartImpl,
 	_buildTaggedElement: (
 		self: AnatomyInstanceImpl<SocketT, TagT>,
 		descriptor: DefTypes.TagDescriptor<TagT>
