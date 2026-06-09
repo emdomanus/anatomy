@@ -9,15 +9,15 @@ local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatom
 
 export type AnatomyCategory = Types.AnatomyCategory
 export type AnatomyId = Types.AnatomyId
-export type AnatomyInstance<TSocketName, TSurfaceName> = AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>
+export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>
 export type AnatomyRole = Types.AnatomyRole
-export type AnatomyTemplate<TSocketName, TSurfaceName> = Types.AnatomyTemplate<TSocketName, TSurfaceName>
-export type AnatomyTemplateImpl<TSocketName, TSurfaceName> = Types.AnatomyTemplateImpl<TSocketName, TSurfaceName>
+export type AnatomyTemplate<SocketT, TagT> = Types.AnatomyTemplate<SocketT, TagT>
+export type AnatomyTemplateImpl<SocketT, TagT> = Types.AnatomyTemplateImpl<SocketT, TagT>
 export type DescriptorMetadata = Types.DescriptorMetadata
 export type PartDescriptor = Types.PartDescriptor
 export type PartName = Types.PartName
-export type RecognizeConfig<TSocketName, TSurfaceName> = Types.RecognizeConfig<TSocketName, TSurfaceName>
-export type SocketDescriptor<TSocketName> = Types.SocketDescriptor<TSocketName>
+export type RecognizeConfig<SocketT, TagT> = Types.RecognizeConfig<SocketT, TagT>
+export type SocketDescriptor<SocketT> = Types.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
 
 local AnatomyTemplate = {}
@@ -137,18 +137,18 @@ local function makeSearchList(root: Instance): { Instance }
 	return list
 end
 
-function AnatomyTemplate.recognize<TSocketName, TSurfaceName>(
+function AnatomyTemplate.recognize<SocketT, TagT>(
 	root: Instance,
-	config: RecognizeConfig<TSocketName, TSurfaceName>
-): AnatomyTemplate<TSocketName, TSurfaceName>
+	config: RecognizeConfig<SocketT, TagT>
+): AnatomyTemplate<SocketT, TagT>
 	local socketAttribute = getAttributeName(config, "socketAttribute")
 	local partAttribute = getAttributeName(config, "partAttribute")
 	local tagsAttribute = getAttributeName(config, "tagsAttribute")
 	local tagDelimiter = if config.tagDelimiter ~= nil and config.tagDelimiter ~= "" then config.tagDelimiter else ";"
 	local tagPathDelimiter = if config.tagPathDelimiter ~= nil and config.tagPathDelimiter ~= "" then config.tagPathDelimiter else "."
 
-	local socketDescriptors: { [TSocketName]: SocketDescriptor<TSocketName> } = {}
-	local tagDescriptors: { TagDescriptor<TSurfaceName> } = {}
+	local socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> } = {}
+	local tagDescriptors: { TagDescriptor<TagT> } = {}
 	local partDescriptors: { [PartName]: PartDescriptor } = {}
 
 	for _, instance in makeSearchList(root) do
@@ -156,7 +156,7 @@ function AnatomyTemplate.recognize<TSocketName, TSurfaceName>(
 			local socketName = readNamedAttribute(instance, socketAttribute, "socket")
 			if socketName ~= nil then
 				assertNameAllowed(socketName, config.socketNameGuard, "socket", root)
-				local typedSocketName = (socketName :: any) :: TSocketName
+				local typedSocketName = (socketName :: any) :: SocketT
 				if socketDescriptors[typedSocketName] ~= nil then
 					error(`Duplicate anatomy socket "{socketName}" in {root:GetFullName()}`, 2)
 				end
@@ -204,14 +204,14 @@ function AnatomyTemplate.recognize<TSocketName, TSurfaceName>(
 	return AnatomyTemplate.new(root, config, socketDescriptors, partDescriptors, tagDescriptors)
 end
 
-function AnatomyTemplate.new<TSocketName, TSurfaceName>(
+function AnatomyTemplate.new<SocketT, TagT>(
 	source: Instance,
-	config: RecognizeConfig<TSocketName, TSurfaceName>,
-	socketDescriptors: { [TSocketName]: SocketDescriptor<TSocketName> }?,
+	config: RecognizeConfig<SocketT, TagT>,
+	socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> }?,
 	partDescriptors: { [PartName]: PartDescriptor }?,
-	tagDescriptors: { TagDescriptor<TSurfaceName> }?
-): AnatomyTemplate<TSocketName, TSurfaceName>
-	local self: AnatomyTemplateImpl<TSocketName, TSurfaceName> = setmetatable({}, AnatomyTemplate) :: any
+	tagDescriptors: { TagDescriptor<TagT> }?
+): AnatomyTemplate<SocketT, TagT>
+	local self: AnatomyTemplateImpl<SocketT, TagT> = setmetatable({}, AnatomyTemplate) :: any
 
 	self._id = config.id
 	self._role = config.role
@@ -226,76 +226,76 @@ function AnatomyTemplate.new<TSocketName, TSurfaceName>(
 	return self
 end
 
-function AnatomyTemplate.getId<TSocketName, TSurfaceName>(self: AnatomyTemplateImpl<TSocketName, TSurfaceName>): AnatomyId?
+function AnatomyTemplate.getId<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): AnatomyId?
 	return self._id
 end
 
-function AnatomyTemplate.getRole<TSocketName, TSurfaceName>(self: AnatomyTemplateImpl<TSocketName, TSurfaceName>): AnatomyRole
+function AnatomyTemplate.getRole<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): AnatomyRole
 	return self._role
 end
 
-function AnatomyTemplate.getCategory<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>
+function AnatomyTemplate.getCategory<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>
 ): AnatomyCategory?
 	return self._category
 end
 
-function AnatomyTemplate.getSource<TSocketName, TSurfaceName>(self: AnatomyTemplateImpl<TSocketName, TSurfaceName>): Instance
+function AnatomyTemplate.getSource<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): Instance
 	return self._source
 end
 
-function AnatomyTemplate.getMetadata<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>
+function AnatomyTemplate.getMetadata<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>
 ): DescriptorMetadata?
 	return self._metadata
 end
 
-function AnatomyTemplate.getSocketDescriptor<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>,
-	name: TSocketName
-): SocketDescriptor<TSocketName>?
+function AnatomyTemplate.getSocketDescriptor<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>,
+	name: SocketT
+): SocketDescriptor<SocketT>?
 	return self._socketDescriptors[name]
 end
 
-function AnatomyTemplate.getSocketDescriptors<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>
-): { [TSocketName]: SocketDescriptor<TSocketName> }
+function AnatomyTemplate.getSocketDescriptors<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>
+): { [SocketT]: SocketDescriptor<SocketT> }
 	return table.clone(self._socketDescriptors)
 end
 
-function AnatomyTemplate.getTagDescriptors<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>
-): { TagDescriptor<TSurfaceName> }
+function AnatomyTemplate.getTagDescriptors<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>
+): { TagDescriptor<TagT> }
 	return table.clone(self._tagDescriptors)
 end
 
-function AnatomyTemplate.getPartDescriptor<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>,
+function AnatomyTemplate.getPartDescriptor<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>,
 	name: PartName
 ): PartDescriptor?
 	return self._partDescriptors[name]
 end
 
-function AnatomyTemplate.getPartDescriptors<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>
+function AnatomyTemplate.getPartDescriptors<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>
 ): { [PartName]: PartDescriptor }
 	return table.clone(self._partDescriptors)
 end
 
-function AnatomyTemplate.instantiate<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>,
+function AnatomyTemplate.instantiate<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>,
 	parent: Instance?
-): AnatomyInstance<TSocketName, TSurfaceName>
+): AnatomyInstance<SocketT, TagT>
 	local root = self._source:Clone()
 	root.Parent = parent
 
 	return AnatomyInstance.new(self, root, true)
 end
 
-function AnatomyTemplate.wrap<TSocketName, TSurfaceName>(
-	self: AnatomyTemplateImpl<TSocketName, TSurfaceName>,
+function AnatomyTemplate.wrap<SocketT, TagT>(
+	self: AnatomyTemplateImpl<SocketT, TagT>,
 	root: Instance
-): AnatomyInstance<TSocketName, TSurfaceName>
+): AnatomyInstance<SocketT, TagT>
 	return AnatomyInstance.new(self, root, false)
 end
 

@@ -33,8 +33,8 @@ export type DescriptorMetadata = { [string]: any }
 
 export type NameGuard<TName> = (name: string) -> boolean
 
-export type SocketDescriptor<TSocketName> = {
-	name: TSocketName,
+export type SocketDescriptor<SocketT> = {
+	name: SocketT,
 	path: AnatomyPath,
 	metadata: DescriptorMetadata?,
 }
@@ -62,7 +62,7 @@ export type InstancePolicy = {
 	anchored: boolean?,
 }
 
-export type RecognizeOptions<TSocketName, TSurfaceName> = {
+export type RecognizeOptions<SocketT, TagT> = {
 	id: AnatomyId?,
 	category: AnatomyCategory?,
 
@@ -71,15 +71,15 @@ export type RecognizeOptions<TSocketName, TSurfaceName> = {
 	tagsAttribute: string?,
 	tagDelimiter: string?,
 	tagPathDelimiter: string?,
-	socketNameGuard: NameGuard<TSocketName>?,
-	tagGuard: ((path: string) -> TSurfaceName?)?,
+	socketNameGuard: NameGuard<SocketT>?,
+	tagGuard: ((path: string) -> TagT?)?,
 
 	instancePolicy: InstancePolicy?,
 
 	metadata: DescriptorMetadata?,
 }
 
-export type RecognizeConfig<TSocketName, TSurfaceName> = RecognizeOptions<TSocketName, TSurfaceName> & {
+export type RecognizeConfig<SocketT, TagT> = RecognizeOptions<SocketT, TagT> & {
 	role: AnatomyRole,
 }
 

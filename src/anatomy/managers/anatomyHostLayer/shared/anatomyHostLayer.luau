@@ -6,17 +6,17 @@ local Types = require(script.Parent.Parent.Parent.Parent.types.managers.anatomyH
 local AnatomyInstanceTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyInstance)
 
 export type AnatomyCategory = Types.AnatomyCategory
-export type AnatomyHostImpl<TSocketName, TSurfaceName> = Types.AnatomyHostImpl<TSocketName, TSurfaceName>
-export type AnatomyHostLayer<TSocketName, TSurfaceName> = Types.AnatomyHostLayer<TSocketName, TSurfaceName>
-export type AnatomyHostLayerImpl<TSocketName, TSurfaceName> = Types.AnatomyHostLayerImpl<TSocketName, TSurfaceName>
-export type AnatomyInstance<TSocketName, TSurfaceName> = AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>
+export type AnatomyHostImpl<SocketT, TagT> = Types.AnatomyHostImpl<SocketT, TagT>
+export type AnatomyHostLayer<SocketT, TagT> = Types.AnatomyHostLayer<SocketT, TagT>
+export type AnatomyHostLayerImpl<SocketT, TagT> = Types.AnatomyHostLayerImpl<SocketT, TagT>
+export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>
 export type LayerId = Types.LayerId
 
 local AnatomyHostLayer = {}
 AnatomyHostLayer.__index = AnatomyHostLayer
 
-local function sortLayers<TSocketName, TSurfaceName>(
-	layerOrder: { AnatomyHostLayerImpl<TSocketName, TSurfaceName> }
+local function sortLayers<SocketT, TagT>(
+	layerOrder: { AnatomyHostLayerImpl<SocketT, TagT> }
 ): ()
 	table.sort(layerOrder, function(left, right)
 		if left._priority == right._priority then
@@ -27,16 +27,16 @@ local function sortLayers<TSocketName, TSurfaceName>(
 	end)
 end
 
-local function new<TSocketName, TSurfaceName>(
-	host: AnatomyHostImpl<TSocketName, TSurfaceName>,
+local function new<SocketT, TagT>(
+	host: AnatomyHostImpl<SocketT, TagT>,
 	id: LayerId,
-	instance: AnatomyInstance<TSocketName, TSurfaceName>,
+	instance: AnatomyInstance<SocketT, TagT>,
 	priority: number,
 	category: AnatomyCategory?,
 	allowSocketOverrides: boolean,
 	insertOrder: number
-): AnatomyHostLayerImpl<TSocketName, TSurfaceName>
-	local self = setmetatable({} :: AnatomyHostLayerImpl<TSocketName, TSurfaceName>, AnatomyHostLayer)
+): AnatomyHostLayerImpl<SocketT, TagT>
+	local self = setmetatable({} :: AnatomyHostLayerImpl<SocketT, TagT>, AnatomyHostLayer)
 
 	self.id = id
 	self._host = host
@@ -50,20 +50,20 @@ local function new<TSocketName, TSurfaceName>(
 	return self
 end
 
-function AnatomyHostLayer.getInstance<TSocketName, TSurfaceName>(
-	self: AnatomyHostLayerImpl<TSocketName, TSurfaceName>
-): AnatomyInstance<TSocketName, TSurfaceName>
+function AnatomyHostLayer.getInstance<SocketT, TagT>(
+	self: AnatomyHostLayerImpl<SocketT, TagT>
+): AnatomyInstance<SocketT, TagT>
 	return self._instance
 end
 
-function AnatomyHostLayer.getPriority<TSocketName, TSurfaceName>(
-	self: AnatomyHostLayerImpl<TSocketName, TSurfaceName>
+function AnatomyHostLayer.getPriority<SocketT, TagT>(
+	self: AnatomyHostLayerImpl<SocketT, TagT>
 ): number
 	return self._priority
 end
 
-function AnatomyHostLayer.setPriority<TSocketName, TSurfaceName>(
-	self: AnatomyHostLayerImpl<TSocketName, TSurfaceName>,
+function AnatomyHostLayer.setPriority<SocketT, TagT>(
+	self: AnatomyHostLayerImpl<SocketT, TagT>,
 	priority: number
 ): ()
 	if self._destroyed or self._priority == priority then
@@ -76,7 +76,7 @@ function AnatomyHostLayer.setPriority<TSocketName, TSurfaceName>(
 	self._host:_refreshAllWatchedPrefixes()
 end
 
-function AnatomyHostLayer.remove<TSocketName, TSurfaceName>(self: AnatomyHostLayerImpl<TSocketName, TSurfaceName>): ()
+function AnatomyHostLayer.remove<SocketT, TagT>(self: AnatomyHostLayerImpl<SocketT, TagT>): ()
 	if self._destroyed then
 		return
 	end

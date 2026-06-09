@@ -4,20 +4,17 @@
 
 local AnatomyHostTypes = require(script.anatomyHost)
 
-export type AnatomyHost<TSocketName, TSurfaceName> = AnatomyHostTypes.AnatomyHost<TSocketName, TSurfaceName>
-export type AnatomyHostOptions<TSocketName, TSurfaceName> = AnatomyHostTypes.AnatomyHostOptions<TSocketName, TSurfaceName>
-export type AnatomyHostLayer<TSocketName, TSurfaceName> = AnatomyHostTypes.AnatomyHostLayer<TSocketName, TSurfaceName>
+export type AnatomyHost<SocketT, TagT> = AnatomyHostTypes.AnatomyHost<SocketT, TagT>
+export type AnatomyHostOptions<SocketT> = AnatomyHostTypes.AnatomyHostOptions<SocketT>
+export type AnatomyHostLayer<SocketT, TagT> = AnatomyHostTypes.AnatomyHostLayer<SocketT, TagT>
 export type AnatomyHostLayerOptions = AnatomyHostTypes.AnatomyHostLayerOptions
 export type AnatomyHostSocketQuery = AnatomyHostTypes.AnatomyHostSocketQuery
 export type AnatomyHostTagQuery = AnatomyHostTypes.AnatomyHostTagQuery
-export type AnatomyHostSocketAddress<TSocketName> = AnatomyHostTypes.AnatomyHostSocketAddress<TSocketName>
-export type AnatomyInstanceSocketAddress<TSocketName, TSurfaceName> =
-	AnatomyHostTypes.AnatomyInstanceSocketAddress<TSocketName, TSurfaceName>
-export type AnatomyHostMountEndpoint<TSocketName, TSurfaceName> =
-	AnatomyHostTypes.AnatomyHostMountEndpoint<TSocketName, TSurfaceName>
-export type AnatomyHostMountConfig<TSocketName, TSurfaceName> =
-	AnatomyHostTypes.AnatomyHostMountConfig<TSocketName, TSurfaceName>
-export type SocketChangedCallback<TSocketName> = AnatomyHostTypes.SocketChangedCallback<TSocketName>
+export type AnatomyHostSocketAddress<SocketT> = AnatomyHostTypes.AnatomyHostSocketAddress<SocketT>
+export type AnatomyInstanceSocketAddress<SocketT> = AnatomyHostTypes.AnatomyInstanceSocketAddress<SocketT>
+export type AnatomyHostMountEndpoint<SocketT> = AnatomyHostTypes.AnatomyHostMountEndpoint<SocketT>
+export type AnatomyHostMountConfig<SocketT> = AnatomyHostTypes.AnatomyHostMountConfig<SocketT>
+export type SocketChangedCallback<SocketT> = AnatomyHostTypes.SocketChangedCallback<SocketT>
 export type TagChangedCallback<TagT> = AnatomyHostTypes.TagChangedCallback<TagT>
 
 return {}

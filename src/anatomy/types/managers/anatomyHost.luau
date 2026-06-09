@@ -19,16 +19,16 @@ export type SocketEndpoint = SocketEndpointTypes.SocketEndpoint
 export type SocketMount = SocketMountTypes.SocketMount
 export type SocketMountOptions = SocketMountTypes.SocketMountOptions
 
-export type SocketQueryCallbackEntry<TSocketName> = {
-	name: TSocketName,
+export type SocketQueryCallbackEntry<SocketT> = {
+	name: SocketT,
 	query: AnatomyHostSocketQuery?,
-	callback: SocketChangedCallback<TSocketName>,
-	current: AnatomySocketTypes.AnatomySocket<TSocketName>?,
+	callback: SocketChangedCallback<SocketT>,
+	current: AnatomySocketTypes.AnatomySocket<SocketT>?,
 }
 
-export type AnatomyHostOptions<TSocketName, TSurfaceName> = {
+export type AnatomyHostOptions<SocketT> = {
 	id: string?,
-	socketNameGuard: NameGuard<TSocketName>?,
+	socketNameGuard: NameGuard<SocketT>?,
 }
 
 export type AnatomyHostLayerOptions = {
@@ -38,14 +38,14 @@ export type AnatomyHostLayerOptions = {
 	allowSocketOverrides: boolean?,
 }
 
-export type AnatomyHostLayer<TSocketName, TSurfaceName> = {
+export type AnatomyHostLayer<SocketT, TagT> = {
 	id: LayerId,
 	getInstance: (
-		self: AnatomyHostLayer<TSocketName, TSurfaceName>
-	) -> AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>,
-	getPriority: (self: AnatomyHostLayer<TSocketName, TSurfaceName>) -> number,
-	setPriority: (self: AnatomyHostLayer<TSocketName, TSurfaceName>, priority: number) -> (),
-	remove: (self: AnatomyHostLayer<TSocketName, TSurfaceName>) -> (),
+		self: AnatomyHostLayer<SocketT, TagT>
+	) -> AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>,
+	getPriority: (self: AnatomyHostLayer<SocketT, TagT>) -> number,
+	setPriority: (self: AnatomyHostLayer<SocketT, TagT>, priority: number) -> (),
+	remove: (self: AnatomyHostLayer<SocketT, TagT>) -> (),
 }
 
 export type AnatomyHostSocketQuery = {
@@ -55,93 +55,93 @@ export type AnatomyHostSocketQuery = {
 
 export type AnatomyHostTagQuery = AnatomyHostSocketQuery
 
-export type AnatomyHostSocketAddress<TSocketName> = AnatomyHostSocketQuery & {
-	socket: TSocketName,
+export type AnatomyHostSocketAddress<SocketT> = AnatomyHostSocketQuery & {
+	socket: SocketT,
 }
 
-export type AnatomyInstanceSocketAddress<TSocketName, TSurfaceName> = {
-	instance: AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>,
-	socket: TSocketName,
+export type AnatomyInstanceSocketAddress<SocketT> = {
+	instance: AnatomyInstanceTypes.AnatomyInstance<SocketT, any>,
+	socket: SocketT,
 }
 
-export type AnatomyHostMountEndpoint<TSocketName, TSurfaceName> =
-	AnatomyHostSocketAddress<TSocketName>
-	| AnatomyInstanceSocketAddress<TSocketName, TSurfaceName>
-	| AnatomySocketTypes.AnatomySocket<TSocketName>
-	| SocketBindingTypes.SocketBinding<TSocketName>
+export type AnatomyHostMountEndpoint<SocketT> =
+	AnatomyHostSocketAddress<SocketT>
+	| AnatomyInstanceSocketAddress<SocketT>
+	| AnatomySocketTypes.AnatomySocket<SocketT>
+	| SocketBindingTypes.SocketBinding<SocketT>
 	| Attachment
 
-export type AnatomyHostMountConfig<TSocketName, TSurfaceName> = {
-	from: AnatomyHostMountEndpoint<TSocketName, TSurfaceName>,
-	to: AnatomyHostMountEndpoint<TSocketName, TSurfaceName>,
+export type AnatomyHostMountConfig<SocketT> = {
+	from: AnatomyHostMountEndpoint<SocketT>,
+	to: AnatomyHostMountEndpoint<SocketT>,
 	options: SocketMountOptions?,
 }
 
-export type SocketChangedCallback<TSocketName> = (AnatomySocketTypes.AnatomySocket<TSocketName>?) -> ()
+export type SocketChangedCallback<SocketT> = (AnatomySocketTypes.AnatomySocket<SocketT>?) -> ()
 export type TagChangedCallback<TagT> = (AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>) -> ()
 
-export type AnatomyHost<TSocketName, TSurfaceName> = {
+export type AnatomyHost<SocketT, TagT> = {
 	push: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
-		instance: AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>,
+		self: AnatomyHost<SocketT, TagT>,
+		instance: AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>,
 		options: AnatomyHostLayerOptions?
-	) -> AnatomyHostLayer<TSocketName, TSurfaceName>,
-	remove: (self: AnatomyHost<TSocketName, TSurfaceName>, layerId: LayerId) -> boolean,
-	clear: (self: AnatomyHost<TSocketName, TSurfaceName>) -> (),
+	) -> AnatomyHostLayer<SocketT, TagT>,
+	remove: (self: AnatomyHost<SocketT, TagT>, layerId: LayerId) -> boolean,
+	clear: (self: AnatomyHost<SocketT, TagT>) -> (),
 
 	getLayer: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
+		self: AnatomyHost<SocketT, TagT>,
 		layerId: LayerId
-	) -> AnatomyHostLayer<TSocketName, TSurfaceName>?,
-	getLayers: (self: AnatomyHost<TSocketName, TSurfaceName>) -> { AnatomyHostLayer<TSocketName, TSurfaceName> },
+	) -> AnatomyHostLayer<SocketT, TagT>?,
+	getLayers: (self: AnatomyHost<SocketT, TagT>) -> { AnatomyHostLayer<SocketT, TagT> },
 	getSocketNames: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
+		self: AnatomyHost<SocketT, TagT>,
 		query: AnatomyHostSocketQuery?
-	) -> { TSocketName },
+	) -> { SocketT },
 	getSockets: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
+		self: AnatomyHost<SocketT, TagT>,
 		query: AnatomyHostSocketQuery?
-	) -> { [TSocketName]: AnatomySocketTypes.AnatomySocket<TSocketName> },
+	) -> { [SocketT]: AnatomySocketTypes.AnatomySocket<SocketT> },
 	getSocket: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
-		name: TSocketName,
+		self: AnatomyHost<SocketT, TagT>,
+		name: SocketT,
 		query: AnatomyHostSocketQuery?
-	) -> AnatomySocketTypes.AnatomySocket<TSocketName>?,
+	) -> AnatomySocketTypes.AnatomySocket<SocketT>?,
 	bindSocket: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
-		name: TSocketName,
-		callback: SocketChangedCallback<TSocketName>,
+		self: AnatomyHost<SocketT, TagT>,
+		name: SocketT,
+		callback: SocketChangedCallback<SocketT>,
 		runInitially: boolean?
 	) -> () -> (),
 	socket: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
-		name: TSocketName,
+		self: AnatomyHost<SocketT, TagT>,
+		name: SocketT,
 		query: AnatomyHostSocketQuery?
-	) -> SocketBindingTypes.SocketBinding<TSocketName>,
+	) -> SocketBindingTypes.SocketBinding<SocketT>,
 
 	getByTag: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
+		self: AnatomyHost<SocketT, TagT>,
 		prefix: string,
 		query: AnatomyHostTagQuery?
-	) -> { AnatomyTaggedElementTypes.AnatomyTaggedElement<TSurfaceName> },
+	) -> { AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT> },
 	bindByTag: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
+		self: AnatomyHost<SocketT, TagT>,
 		prefix: string,
-		onAdded: TagChangedCallback<TSurfaceName>,
-		onRemoved: TagChangedCallback<TSurfaceName>,
+		onAdded: TagChangedCallback<TagT>,
+		onRemoved: TagChangedCallback<TagT>,
 		runInitially: boolean?
 	) -> () -> (),
 
 	mount: (
-		self: AnatomyHost<TSocketName, TSurfaceName>,
-		config: AnatomyHostMountConfig<TSocketName, TSurfaceName>
+		self: AnatomyHost<SocketT, TagT>,
+		config: AnatomyHostMountConfig<SocketT>
 	) -> SocketMount,
-	deconstruct: (self: AnatomyHost<TSocketName, TSurfaceName>) -> (),
+	deconstruct: (self: AnatomyHost<SocketT, TagT>) -> (),
 }
 
-export type AnatomyHostLayerImpl<TSocketName, TSurfaceName> = AnatomyHostLayer<TSocketName, TSurfaceName> & {
-	_host: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	_instance: AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>,
+export type AnatomyHostLayerImpl<SocketT, TagT> = AnatomyHostLayer<SocketT, TagT> & {
+	_host: AnatomyHostImpl<SocketT, TagT>,
+	_instance: AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>,
 	_priority: number,
 	_category: AnatomyCategory?,
 	_allowSocketOverrides: boolean,
@@ -149,33 +149,33 @@ export type AnatomyHostLayerImpl<TSocketName, TSurfaceName> = AnatomyHostLayer<T
 	_destroyed: boolean,
 }
 
-export type AnatomyHostImpl<TSocketName, TSurfaceName> = AnatomyHost<TSocketName, TSurfaceName> & {
+export type AnatomyHostImpl<SocketT, TagT> = AnatomyHost<SocketT, TagT> & {
 	_id: string?,
-	_socketNameGuard: NameGuard<TSocketName>?,
-	_layers: { [LayerId]: AnatomyHostLayerImpl<TSocketName, TSurfaceName> },
-	_layerOrder: { AnatomyHostLayerImpl<TSocketName, TSurfaceName> },
-	_resolvedSockets: { [TSocketName]: AnatomySocketTypes.AnatomySocket<TSocketName>? },
-	_socketCallbacks: { [TSocketName]: CallbackSet },
-	_socketQueryCallbacks: { [SocketQueryCallbackEntry<TSocketName>]: true },
+	_socketNameGuard: NameGuard<SocketT>?,
+	_layers: { [LayerId]: AnatomyHostLayerImpl<SocketT, TagT> },
+	_layerOrder: { AnatomyHostLayerImpl<SocketT, TagT> },
+	_resolvedSockets: { [SocketT]: AnatomySocketTypes.AnatomySocket<SocketT>? },
+	_socketCallbacks: { [SocketT]: CallbackSet },
+	_socketQueryCallbacks: { [SocketQueryCallbackEntry<SocketT>]: true },
 	_tagPrefixCallbacks: { [string]: { added: CallbackSet, removed: CallbackSet } },
-	_resolvedByPrefix: { [string]: { [AnatomyTaggedElementTypes.AnatomyTaggedElement<TSurfaceName>]: true } },
-	_bindings: { [SocketBindingTypes.SocketBindingImpl<TSocketName>]: true },
+	_resolvedByPrefix: { [string]: { [AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>]: true } },
+	_bindings: { [SocketBindingTypes.SocketBindingImpl<SocketT>]: true },
 	_mounts: { [SocketMountTypes.SocketMountImpl]: true },
 	_nextLayerOrdinal: number,
 	_destroyed: boolean,
 
 	_resolveSocket: (
-		self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-		name: TSocketName,
+		self: AnatomyHostImpl<SocketT, TagT>,
+		name: SocketT,
 		query: AnatomyHostSocketQuery?
-	) -> AnatomySocketTypes.AnatomySocket<TSocketName>?,
-	_refreshSocket: (self: AnatomyHostImpl<TSocketName, TSurfaceName>, name: TSocketName) -> (),
-	_refreshAllSockets: (self: AnatomyHostImpl<TSocketName, TSurfaceName>) -> (),
-	_refreshTagPrefix: (self: AnatomyHostImpl<TSocketName, TSurfaceName>, prefix: string) -> (),
-	_refreshAllWatchedPrefixes: (self: AnatomyHostImpl<TSocketName, TSurfaceName>) -> (),
+	) -> AnatomySocketTypes.AnatomySocket<SocketT>?,
+	_refreshSocket: (self: AnatomyHostImpl<SocketT, TagT>, name: SocketT) -> (),
+	_refreshAllSockets: (self: AnatomyHostImpl<SocketT, TagT>) -> (),
+	_refreshTagPrefix: (self: AnatomyHostImpl<SocketT, TagT>, prefix: string) -> (),
+	_refreshAllWatchedPrefixes: (self: AnatomyHostImpl<SocketT, TagT>) -> (),
 	_normalizeEndpoint: (
-		self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-		endpoint: AnatomyHostMountEndpoint<TSocketName, TSurfaceName>
+		self: AnatomyHostImpl<SocketT, TagT>,
+		endpoint: AnatomyHostMountEndpoint<SocketT>
 	) -> SocketEndpoint,
 }
 

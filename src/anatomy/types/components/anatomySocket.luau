@@ -13,23 +13,23 @@ export type MountAttachment = SocketEndpointTypes.MountAttachment
 export type SocketEndpoint = SocketEndpointTypes.SocketEndpoint
 export type SocketAttachmentChangedCallback = SocketEndpointTypes.SocketAttachmentChangedCallback
 
-export type AnatomySocket<TSocketName> = SocketEndpoint & {
-	getName: (self: AnatomySocket<TSocketName>) -> TSocketName,
-	getPath: (self: AnatomySocket<TSocketName>) -> AnatomyPath,
-	getMetadata: (self: AnatomySocket<TSocketName>) -> DescriptorMetadata?,
-	deconstruct: (self: AnatomySocket<TSocketName>) -> (),
+export type AnatomySocket<SocketT> = SocketEndpoint & {
+	getName: (self: AnatomySocket<SocketT>) -> SocketT,
+	getPath: (self: AnatomySocket<SocketT>) -> AnatomyPath,
+	getMetadata: (self: AnatomySocket<SocketT>) -> DescriptorMetadata?,
+	deconstruct: (self: AnatomySocket<SocketT>) -> (),
 }
 
-export type AnatomySocketImpl<TSocketName> = AnatomySocket<TSocketName> & {
+export type AnatomySocketImpl<SocketT> = AnatomySocket<SocketT> & {
 	_owner: any,
-	_name: TSocketName,
+	_name: SocketT,
 	_path: AnatomyPath,
 	_attachment: MountAttachment?,
 	_metadata: DescriptorMetadata?,
 	_attachmentChangedCallbacks: CallbackSet,
 	_destroyed: boolean,
 
-	_setAttachment: (self: AnatomySocketImpl<TSocketName>, attachment: MountAttachment?) -> (),
+	_setAttachment: (self: AnatomySocketImpl<SocketT>, attachment: MountAttachment?) -> (),
 }
 
 return {}

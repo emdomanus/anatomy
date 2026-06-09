@@ -13,22 +13,22 @@ local AnatomyTaggedElementTypes = require(script.Parent.Parent.Parent.Parent.typ
 local SocketBindingTypes = require(script.Parent.Parent.Parent.Parent.types.components.socketBinding)
 local Types = require(script.Parent.Parent.Parent.Parent.types.managers.anatomyHost)
 
-export type AnatomyHost<TSocketName, TSurfaceName> = Types.AnatomyHost<TSocketName, TSurfaceName>
-export type AnatomyHostImpl<TSocketName, TSurfaceName> = Types.AnatomyHostImpl<TSocketName, TSurfaceName>
-export type AnatomyHostLayer<TSocketName, TSurfaceName> = Types.AnatomyHostLayer<TSocketName, TSurfaceName>
-export type AnatomyHostLayerImpl<TSocketName, TSurfaceName> = Types.AnatomyHostLayerImpl<TSocketName, TSurfaceName>
+export type AnatomyHost<SocketT, TagT> = Types.AnatomyHost<SocketT, TagT>
+export type AnatomyHostImpl<SocketT, TagT> = Types.AnatomyHostImpl<SocketT, TagT>
+export type AnatomyHostLayer<SocketT, TagT> = Types.AnatomyHostLayer<SocketT, TagT>
+export type AnatomyHostLayerImpl<SocketT, TagT> = Types.AnatomyHostLayerImpl<SocketT, TagT>
 export type AnatomyHostLayerOptions = Types.AnatomyHostLayerOptions
-export type AnatomyHostMountConfig<TSocketName, TSurfaceName> = Types.AnatomyHostMountConfig<TSocketName, TSurfaceName>
-export type AnatomyHostMountEndpoint<TSocketName, TSurfaceName> = Types.AnatomyHostMountEndpoint<TSocketName, TSurfaceName>
-export type AnatomyHostOptions<TSocketName, TSurfaceName> = Types.AnatomyHostOptions<TSocketName, TSurfaceName>
+export type AnatomyHostMountConfig<SocketT> = Types.AnatomyHostMountConfig<SocketT>
+export type AnatomyHostMountEndpoint<SocketT> = Types.AnatomyHostMountEndpoint<SocketT>
+export type AnatomyHostOptions<SocketT> = Types.AnatomyHostOptions<SocketT>
 export type AnatomyHostTagQuery = Types.AnatomyHostTagQuery
 export type AnatomyHostSocketQuery = Types.AnatomyHostSocketQuery
-export type AnatomyInstance<TSocketName, TSurfaceName> = AnatomyInstanceTypes.AnatomyInstance<TSocketName, TSurfaceName>
+export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>
 export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
-export type AnatomySocket<TSocketName> = AnatomySocketTypes.AnatomySocket<TSocketName>
+export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 export type LayerId = Types.LayerId
-export type SocketBinding<TSocketName> = SocketBindingTypes.SocketBinding<TSocketName>
-export type SocketChangedCallback<TSocketName> = Types.SocketChangedCallback<TSocketName>
+export type SocketBinding<SocketT> = SocketBindingTypes.SocketBinding<SocketT>
+export type SocketChangedCallback<SocketT> = Types.SocketChangedCallback<SocketT>
 export type SocketEndpoint = Types.SocketEndpoint
 export type SocketMount = Types.SocketMount
 export type TagChangedCallback<TagT> = Types.TagChangedCallback<TagT>
@@ -42,8 +42,8 @@ local function weakKeySet(): { [any]: true }
 	}) :: any
 end
 
-local function sortHostLayers<TSocketName, TSurfaceName>(
-	layerOrder: { AnatomyHostLayerImpl<TSocketName, TSurfaceName> }
+local function sortHostLayers<SocketT, TagT>(
+	layerOrder: { AnatomyHostLayerImpl<SocketT, TagT> }
 ): ()
 	table.sort(layerOrder, function(left, right)
 		if left._priority == right._priority then
@@ -54,9 +54,9 @@ local function sortHostLayers<TSocketName, TSurfaceName>(
 	end)
 end
 
-local function collectSocketNames<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>
-): { [TSocketName]: boolean }
+local function collectSocketNames<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>
+): { [SocketT]: boolean }
 	local names = {}
 
 	for name in self._resolvedSockets do
@@ -99,11 +99,11 @@ local function areTagCallbacksEmpty(callbacks: { added: { [any]: true }, removed
 	return isCallbackSetEmpty(callbacks.added) and isCallbackSetEmpty(callbacks.removed)
 end
 
-local function collectTaggedElements<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+local function collectTaggedElements<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string,
 	query: AnatomyHostTagQuery?
-): { AnatomyTaggedElement<TSurfaceName> }
+): { AnatomyTaggedElement<TagT> }
 	if query ~= nil and query.layerId ~= nil then
 		local layer = self._layers[query.layerId]
 		if layer == nil then
@@ -123,10 +123,10 @@ local function collectTaggedElements<TSocketName, TSurfaceName>(
 	return elements
 end
 
-local function collectTaggedElementSet<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+local function collectTaggedElementSet<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string
-): { [AnatomyTaggedElement<TSurfaceName>]: true }
+): { [AnatomyTaggedElement<TagT>]: true }
 	local set = {}
 
 	for _, element in collectTaggedElements(self, prefix, nil) do
@@ -157,9 +157,9 @@ local function copyQuery(query: AnatomyHostSocketQuery?): AnatomyHostSocketQuery
 	}
 end
 
-local function assertSocketNameAllowed<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSocketName
+local function assertSocketNameAllowed<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT
 ): ()
 	local guard = self._socketNameGuard
 	if guard ~= nil and not guard(name :: any) then
@@ -167,10 +167,10 @@ local function assertSocketNameAllowed<TSocketName, TSurfaceName>(
 	end
 end
 
-local function new<TSocketName, TSurfaceName>(
-	options: AnatomyHostOptions<TSocketName, TSurfaceName>?
-): AnatomyHost<TSocketName, TSurfaceName>
-	local self = setmetatable({} :: AnatomyHostImpl<TSocketName, TSurfaceName>, AnatomyHost)
+local function new<SocketT, TagT>(
+	options: AnatomyHostOptions<SocketT>?
+): AnatomyHost<SocketT, TagT>
+	local self = setmetatable({} :: AnatomyHostImpl<SocketT, TagT>, AnatomyHost)
 
 	self._id = if options then options.id else nil
 	self._socketNameGuard = if options then options.socketNameGuard else nil
@@ -189,11 +189,11 @@ local function new<TSocketName, TSurfaceName>(
 	return self
 end
 
-function AnatomyHost.push<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	instance: AnatomyInstance<TSocketName, TSurfaceName>,
+function AnatomyHost.push<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	instance: AnatomyInstance<SocketT, TagT>,
 	options: AnatomyHostLayerOptions?
-): AnatomyHostLayer<TSocketName, TSurfaceName>
+): AnatomyHostLayer<SocketT, TagT>
 	local layerId = if options and options.id then options.id else `layer_{self._nextLayerOrdinal}`
 	if self._layers[layerId] ~= nil then
 		error(`AnatomyHost layer "{layerId}" already exists`, 2)
@@ -226,8 +226,8 @@ function AnatomyHost.push<TSocketName, TSurfaceName>(
 	return layer
 end
 
-function AnatomyHost.remove<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+function AnatomyHost.remove<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	layerId: LayerId
 ): boolean
 	local layer = self._layers[layerId]
@@ -248,7 +248,7 @@ function AnatomyHost.remove<TSocketName, TSurfaceName>(
 	return true
 end
 
-function AnatomyHost.clear<TSocketName, TSurfaceName>(self: AnatomyHostImpl<TSocketName, TSurfaceName>): ()
+function AnatomyHost.clear<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>): ()
 	local layerIds = {}
 	for layerId in self._layers do
 		table.insert(layerIds, layerId)
@@ -259,24 +259,24 @@ function AnatomyHost.clear<TSocketName, TSurfaceName>(self: AnatomyHostImpl<TSoc
 	end
 end
 
-function AnatomyHost.getLayer<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+function AnatomyHost.getLayer<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	layerId: LayerId
-): AnatomyHostLayer<TSocketName, TSurfaceName>?
+): AnatomyHostLayer<SocketT, TagT>?
 	return self._layers[layerId]
 end
 
-function AnatomyHost.getLayers<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>
-): { AnatomyHostLayer<TSocketName, TSurfaceName> }
+function AnatomyHost.getLayers<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>
+): { AnatomyHostLayer<SocketT, TagT> }
 	return table.clone(self._layerOrder) :: any
 end
 
-function AnatomyHost.getSocketNames<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+function AnatomyHost.getSocketNames<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	query: AnatomyHostSocketQuery?
-): { TSocketName }
-	local names: { [TSocketName]: boolean } = {}
+): { SocketT }
+	local names: { [SocketT]: boolean } = {}
 
 	if query ~= nil and query.layerId ~= nil then
 		local layer = self._layers[query.layerId]
@@ -300,11 +300,11 @@ function AnatomyHost.getSocketNames<TSocketName, TSurfaceName>(
 	return makeSortedNameList(names) :: any
 end
 
-function AnatomyHost.getSockets<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+function AnatomyHost.getSockets<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	query: AnatomyHostSocketQuery?
-): { [TSocketName]: AnatomySocket<TSocketName> }
-	local sockets: { [TSocketName]: AnatomySocket<TSocketName> } = {}
+): { [SocketT]: AnatomySocket<SocketT> }
+	local sockets: { [SocketT]: AnatomySocket<SocketT> } = {}
 
 	if query ~= nil and query.layerId ~= nil then
 		local layer = self._layers[query.layerId]
@@ -327,19 +327,19 @@ function AnatomyHost.getSockets<TSocketName, TSurfaceName>(
 	return sockets
 end
 
-function AnatomyHost.getSocket<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSocketName,
+function AnatomyHost.getSocket<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT,
 	query: AnatomyHostSocketQuery?
-): AnatomySocket<TSocketName>?
+): AnatomySocket<SocketT>?
 	assertSocketNameAllowed(self, name)
 	return self:_resolveSocket(name, query)
 end
 
-function AnatomyHost.bindSocket<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSocketName,
-	callback: SocketChangedCallback<TSocketName>,
+function AnatomyHost.bindSocket<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT,
+	callback: SocketChangedCallback<SocketT>,
 	runInitially: boolean?
 ): () -> ()
 	assertSocketNameAllowed(self, name)
@@ -357,11 +357,11 @@ function AnatomyHost.bindSocket<TSocketName, TSurfaceName>(
 	return CallbackSet.bind(callbacks, callback)
 end
 
-local function bindSocketQuery<TSocketName, TSurfaceName>(
-	host: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSocketName,
+local function bindSocketQuery<SocketT, TagT>(
+	host: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT,
 	query: AnatomyHostSocketQuery?,
-	callback: SocketChangedCallback<TSocketName>,
+	callback: SocketChangedCallback<SocketT>,
 	runInitially: boolean?
 ): () -> ()
 	assertSocketNameAllowed(host, name)
@@ -388,11 +388,11 @@ local function bindSocketQuery<TSocketName, TSurfaceName>(
 	end
 end
 
-function AnatomyHost.getByTag<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+function AnatomyHost.getByTag<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string,
 	query: AnatomyHostTagQuery?
-): { AnatomyTaggedElement<TSurfaceName> }
+): { AnatomyTaggedElement<TagT> }
 	local resolved = if query == nil then self._resolvedByPrefix[prefix] else nil
 	if resolved ~= nil then
 		return tagSetToList(resolved)
@@ -401,11 +401,11 @@ function AnatomyHost.getByTag<TSocketName, TSurfaceName>(
 	return collectTaggedElements(self, prefix, query)
 end
 
-function AnatomyHost.bindByTag<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+function AnatomyHost.bindByTag<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string,
-	onAdded: TagChangedCallback<TSurfaceName>,
-	onRemoved: TagChangedCallback<TSurfaceName>,
+	onAdded: TagChangedCallback<TagT>,
+	onRemoved: TagChangedCallback<TagT>,
 	runInitially: boolean?
 ): () -> ()
 	local callbacks = self._tagPrefixCallbacks[prefix]
@@ -444,19 +444,19 @@ function AnatomyHost.bindByTag<TSocketName, TSurfaceName>(
 	end
 end
 
-function AnatomyHost.socket<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSocketName,
+function AnatomyHost.socket<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT,
 	query: AnatomyHostSocketQuery?
-): SocketBinding<TSocketName>
+): SocketBinding<SocketT>
 	assertSocketNameAllowed(self, name)
 
 	local queryCopy = copyQuery(query)
 	local source = {
 		bindSocket = function(
 			_source: any,
-			socketName: TSocketName,
-			callback: SocketChangedCallback<TSocketName>,
+			socketName: SocketT,
+			callback: SocketChangedCallback<SocketT>,
 			runInitially: boolean?
 		): () -> ()
 			return bindSocketQuery(self, socketName, queryCopy, callback, runInitially)
@@ -469,9 +469,9 @@ function AnatomyHost.socket<TSocketName, TSurfaceName>(
 	return binding
 end
 
-function AnatomyHost.mount<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	config: AnatomyHostMountConfig<TSocketName, TSurfaceName>
+function AnatomyHost.mount<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	config: AnatomyHostMountConfig<SocketT>
 ): SocketMount
 	local mount = SocketMount.new(
 		self:_normalizeEndpoint(config.from),
@@ -483,11 +483,11 @@ function AnatomyHost.mount<TSocketName, TSurfaceName>(
 	return mount
 end
 
-function AnatomyHost._resolveSocket<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSocketName,
+function AnatomyHost._resolveSocket<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT,
 	query: AnatomyHostSocketQuery?
-): AnatomySocket<TSocketName>?
+): AnatomySocket<SocketT>?
 	if query ~= nil and query.layerId ~= nil then
 		local layer = self._layers[query.layerId]
 		if layer == nil then
@@ -497,7 +497,7 @@ function AnatomyHost._resolveSocket<TSocketName, TSurfaceName>(
 		return layer._instance:getSocket(name)
 	end
 
-	local resolved: AnatomySocket<TSocketName>? = nil
+	local resolved: AnatomySocket<SocketT>? = nil
 	local includeOverrides = query == nil or query.includeOverrides ~= false
 
 	for _, layer in self._layerOrder do
@@ -519,9 +519,9 @@ function AnatomyHost._resolveSocket<TSocketName, TSurfaceName>(
 	return resolved
 end
 
-function AnatomyHost._refreshSocket<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	name: TSocketName
+function AnatomyHost._refreshSocket<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT
 ): ()
 	local oldSocket = self._resolvedSockets[name]
 	local newSocket = self:_resolveSocket(name, nil)
@@ -537,8 +537,8 @@ function AnatomyHost._refreshSocket<TSocketName, TSurfaceName>(
 	end
 end
 
-function AnatomyHost._refreshAllSockets<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>
+function AnatomyHost._refreshAllSockets<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>
 ): ()
 	for name in collectSocketNames(self) do
 		self:_refreshSocket(name)
@@ -553,8 +553,8 @@ function AnatomyHost._refreshAllSockets<TSocketName, TSurfaceName>(
 	end
 end
 
-function AnatomyHost._refreshTagPrefix<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
+function AnatomyHost._refreshTagPrefix<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string
 ): ()
 	local oldSet = self._resolvedByPrefix[prefix]
@@ -583,17 +583,17 @@ function AnatomyHost._refreshTagPrefix<TSocketName, TSurfaceName>(
 	end
 end
 
-function AnatomyHost._refreshAllWatchedPrefixes<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>
+function AnatomyHost._refreshAllWatchedPrefixes<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>
 ): ()
 	for prefix in self._tagPrefixCallbacks do
 		self:_refreshTagPrefix(prefix)
 	end
 end
 
-function AnatomyHost._normalizeEndpoint<TSocketName, TSurfaceName>(
-	self: AnatomyHostImpl<TSocketName, TSurfaceName>,
-	endpoint: AnatomyHostMountEndpoint<TSocketName, TSurfaceName>
+function AnatomyHost._normalizeEndpoint<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	endpoint: AnatomyHostMountEndpoint<SocketT>
 ): SocketEndpoint
 	local endpointValue = endpoint :: any
 	if typeof(endpointValue) == "Instance" and endpointValue:IsA("Attachment") then
@@ -606,7 +606,7 @@ function AnatomyHost._normalizeEndpoint<TSocketName, TSurfaceName>(
 		end
 
 		if endpointValue.instance ~= nil and endpointValue.socket ~= nil then
-			local socketName = (endpointValue.socket :: any) :: TSocketName
+			local socketName = (endpointValue.socket :: any) :: SocketT
 			assertSocketNameAllowed(self, socketName)
 
 			local socket = endpointValue.instance:getSocket(socketName)
@@ -618,7 +618,7 @@ function AnatomyHost._normalizeEndpoint<TSocketName, TSurfaceName>(
 		end
 
 		if endpointValue.socket ~= nil then
-			local socketName = (endpointValue.socket :: any) :: TSocketName
+			local socketName = (endpointValue.socket :: any) :: SocketT
 			assertSocketNameAllowed(self, socketName)
 
 			return self:socket(socketName, endpointValue)
@@ -628,7 +628,7 @@ function AnatomyHost._normalizeEndpoint<TSocketName, TSurfaceName>(
 	error("Invalid anatomy socket mount endpoint", 2)
 end
 
-function AnatomyHost.deconstruct<TSocketName, TSurfaceName>(self: AnatomyHostImpl<TSocketName, TSurfaceName>): ()
+function AnatomyHost.deconstruct<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>): ()
 	if self._destroyed then
 		return
 	end

@@ -5,22 +5,22 @@
 local CallbackSet = require(script.Parent.Parent.Parent.Parent.utils.callbackSet)
 local Types = require(script.Parent.Parent.Parent.Parent.types.components.socketBinding)
 
-export type AnatomySocket<TSocketName> = Types.AnatomySocket<TSocketName>
+export type AnatomySocket<SocketT> = Types.AnatomySocket<SocketT>
 export type MountAttachment = Types.MountAttachment
 export type SocketAttachmentChangedCallback = Types.SocketAttachmentChangedCallback
-export type SocketBinding<TSocketName> = Types.SocketBinding<TSocketName>
-export type SocketBindingImpl<TSocketName> = Types.SocketBindingImpl<TSocketName>
-export type SocketChangedCallback<TSocketName> = Types.SocketChangedCallback<TSocketName>
+export type SocketBinding<SocketT> = Types.SocketBinding<SocketT>
+export type SocketBindingImpl<SocketT> = Types.SocketBindingImpl<SocketT>
+export type SocketChangedCallback<SocketT> = Types.SocketChangedCallback<SocketT>
 
 local SocketBinding = {}
 SocketBinding.__index = SocketBinding
 
-function SocketBinding.new<TSocketName>(
-	name: TSocketName,
+function SocketBinding.new<SocketT>(
+	name: SocketT,
 	source: any?,
-	initialSocket: AnatomySocket<TSocketName>?
-): SocketBinding<TSocketName>
-	local self: SocketBindingImpl<TSocketName> = setmetatable({}, SocketBinding) :: any
+	initialSocket: AnatomySocket<SocketT>?
+): SocketBinding<SocketT>
+	local self: SocketBindingImpl<SocketT> = setmetatable({}, SocketBinding) :: any
 
 	self._name = name
 	self._socket = nil
@@ -32,7 +32,7 @@ function SocketBinding.new<TSocketName>(
 	self._destroyed = false
 
 	if source ~= nil then
-		self._sourceDisconnect = source:bindSocket(name, function(socket: AnatomySocket<TSocketName>?)
+		self._sourceDisconnect = source:bindSocket(name, function(socket: AnatomySocket<SocketT>?)
 			self:_setSocket(socket)
 		end, true)
 	elseif initialSocket ~= nil then
@@ -42,11 +42,11 @@ function SocketBinding.new<TSocketName>(
 	return self
 end
 
-function SocketBinding.getName<TSocketName>(self: SocketBindingImpl<TSocketName>): TSocketName
+function SocketBinding.getName<SocketT>(self: SocketBindingImpl<SocketT>): SocketT
 	return self._name
 end
 
-function SocketBinding.getSocket<TSocketName>(self: SocketBindingImpl<TSocketName>): AnatomySocket<TSocketName>?
+function SocketBinding.getSocket<SocketT>(self: SocketBindingImpl<SocketT>): AnatomySocket<SocketT>?
 	if self._destroyed then
 		return nil
 	end
@@ -54,7 +54,7 @@ function SocketBinding.getSocket<TSocketName>(self: SocketBindingImpl<TSocketNam
 	return self._socket
 end
 
-function SocketBinding.getAttachment<TSocketName>(self: SocketBindingImpl<TSocketName>): Attachment?
+function SocketBinding.getAttachment<SocketT>(self: SocketBindingImpl<SocketT>): Attachment?
 	local socket = self:getSocket()
 	if socket == nil then
 		return nil
@@ -63,8 +63,8 @@ function SocketBinding.getAttachment<TSocketName>(self: SocketBindingImpl<TSocke
 	return socket:getAttachment()
 end
 
-function SocketBinding.bindAttachmentChanged<TSocketName>(
-	self: SocketBindingImpl<TSocketName>,
+function SocketBinding.bindAttachmentChanged<SocketT>(
+	self: SocketBindingImpl<SocketT>,
 	callback: SocketAttachmentChangedCallback,
 	runInitially: boolean?
 ): () -> ()
@@ -75,9 +75,9 @@ function SocketBinding.bindAttachmentChanged<TSocketName>(
 	return CallbackSet.bind(self._attachmentChangedCallbacks, callback)
 end
 
-function SocketBinding.bindSocketChanged<TSocketName>(
-	self: SocketBindingImpl<TSocketName>,
-	callback: SocketChangedCallback<TSocketName>,
+function SocketBinding.bindSocketChanged<SocketT>(
+	self: SocketBindingImpl<SocketT>,
+	callback: SocketChangedCallback<SocketT>,
 	runInitially: boolean?
 ): () -> ()
 	if runInitially == true then
@@ -87,7 +87,7 @@ function SocketBinding.bindSocketChanged<TSocketName>(
 	return CallbackSet.bind(self._socketChangedCallbacks, callback)
 end
 
-function SocketBinding._setSocket<TSocketName>(self: SocketBindingImpl<TSocketName>, socket: AnatomySocket<TSocketName>?): ()
+function SocketBinding._setSocket<SocketT>(self: SocketBindingImpl<SocketT>, socket: AnatomySocket<SocketT>?): ()
 	if self._socket == socket then
 		return
 	end
@@ -111,7 +111,7 @@ function SocketBinding._setSocket<TSocketName>(self: SocketBindingImpl<TSocketNa
 	CallbackSet.fire(self._attachmentChangedCallbacks, self:getAttachment())
 end
 
-function SocketBinding.deconstruct<TSocketName>(self: SocketBindingImpl<TSocketName>): ()
+function SocketBinding.deconstruct<SocketT>(self: SocketBindingImpl<SocketT>): ()
 	if self._destroyed then
 		return
 	end

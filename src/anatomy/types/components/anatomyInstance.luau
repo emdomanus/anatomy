@@ -16,35 +16,35 @@ export type DescriptorMetadata = DefTypes.DescriptorMetadata
 export type InstancePolicy = DefTypes.InstancePolicy
 export type PartName = DefTypes.PartName
 export type PartDescriptor = DefTypes.PartDescriptor
-export type SocketDescriptor<TSocketName> = DefTypes.SocketDescriptor<TSocketName>
+export type SocketDescriptor<SocketT> = DefTypes.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = DefTypes.TagDescriptor<TagT>
 
-export type AnatomyInstance<TSocketName, TSurfaceName> = {
-	getId: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> AnatomyId?,
-	getRole: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> AnatomyRole,
-	getCategory: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> AnatomyCategory?,
-	getRoot: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> Instance,
-	getTemplate: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> any,
-	getMetadata: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> DescriptorMetadata?,
+export type AnatomyInstance<SocketT, TagT> = {
+	getId: (self: AnatomyInstance<SocketT, TagT>) -> AnatomyId?,
+	getRole: (self: AnatomyInstance<SocketT, TagT>) -> AnatomyRole,
+	getCategory: (self: AnatomyInstance<SocketT, TagT>) -> AnatomyCategory?,
+	getRoot: (self: AnatomyInstance<SocketT, TagT>) -> Instance,
+	getTemplate: (self: AnatomyInstance<SocketT, TagT>) -> any,
+	getMetadata: (self: AnatomyInstance<SocketT, TagT>) -> DescriptorMetadata?,
 
 	getSocket: (
-		self: AnatomyInstance<TSocketName, TSurfaceName>,
-		name: TSocketName
-	) -> AnatomySocketTypes.AnatomySocket<TSocketName>?,
-	getSockets: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> { [TSocketName]: AnatomySocketTypes.AnatomySocket<TSocketName> },
-	getPart: (self: AnatomyInstance<TSocketName, TSurfaceName>, name: PartName) -> AnatomyPart?,
-	getParts: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> { [PartName]: AnatomyPart },
+		self: AnatomyInstance<SocketT, TagT>,
+		name: SocketT
+	) -> AnatomySocketTypes.AnatomySocket<SocketT>?,
+	getSockets: (self: AnatomyInstance<SocketT, TagT>) -> { [SocketT]: AnatomySocketTypes.AnatomySocket<SocketT> },
+	getPart: (self: AnatomyInstance<SocketT, TagT>, name: PartName) -> AnatomyPart?,
+	getParts: (self: AnatomyInstance<SocketT, TagT>) -> { [PartName]: AnatomyPart },
 	getByTag: (
-		self: AnatomyInstance<TSocketName, TSurfaceName>,
+		self: AnatomyInstance<SocketT, TagT>,
 		prefix: string
-	) -> { AnatomyTaggedElementTypes.AnatomyTaggedElement<TSurfaceName> },
+	) -> { AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT> },
 
-	setParent: (self: AnatomyInstance<TSocketName, TSurfaceName>, parent: Instance?) -> (),
-	applyInstancePolicy: (self: AnatomyInstance<TSocketName, TSurfaceName>, policy: InstancePolicy) -> (),
-	deconstruct: (self: AnatomyInstance<TSocketName, TSurfaceName>) -> (),
+	setParent: (self: AnatomyInstance<SocketT, TagT>, parent: Instance?) -> (),
+	applyInstancePolicy: (self: AnatomyInstance<SocketT, TagT>, policy: InstancePolicy) -> (),
+	deconstruct: (self: AnatomyInstance<SocketT, TagT>) -> (),
 }
 
-export type AnatomyInstanceImpl<TSocketName, TSurfaceName> = AnatomyInstance<TSocketName, TSurfaceName> & {
+export type AnatomyInstanceImpl<SocketT, TagT> = AnatomyInstance<SocketT, TagT> & {
 	_template: any,
 	_root: Instance,
 	_id: AnatomyId?,
@@ -53,22 +53,22 @@ export type AnatomyInstanceImpl<TSocketName, TSurfaceName> = AnatomyInstance<TSo
 	_metadata: DescriptorMetadata?,
 	_ownsRoot: boolean,
 
-	_sockets: { [TSocketName]: AnatomySocketTypes.AnatomySocketImpl<TSocketName> },
+	_sockets: { [SocketT]: AnatomySocketTypes.AnatomySocketImpl<SocketT> },
 	_parts: { [PartName]: AnatomyPartImpl },
-	_taggedElements: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TSurfaceName> },
-	_tagPrefixIndex: { [string]: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TSurfaceName> } },
+	_taggedElements: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT> },
+	_tagPrefixIndex: { [string]: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT> } },
 	_destroyed: boolean,
 
-	_resolvePath: (self: AnatomyInstanceImpl<TSocketName, TSurfaceName>, path: DefTypes.AnatomyPath) -> Instance?,
+	_resolvePath: (self: AnatomyInstanceImpl<SocketT, TagT>, path: DefTypes.AnatomyPath) -> Instance?,
 	_buildSocket: (
-		self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
-		descriptor: DefTypes.SocketDescriptor<TSocketName>
-	) -> AnatomySocketTypes.AnatomySocketImpl<TSocketName>,
-	_buildPart: (self: AnatomyInstanceImpl<TSocketName, TSurfaceName>, descriptor: DefTypes.PartDescriptor) -> AnatomyPartImpl,
+		self: AnatomyInstanceImpl<SocketT, TagT>,
+		descriptor: DefTypes.SocketDescriptor<SocketT>
+	) -> AnatomySocketTypes.AnatomySocketImpl<SocketT>,
+	_buildPart: (self: AnatomyInstanceImpl<SocketT, TagT>, descriptor: DefTypes.PartDescriptor) -> AnatomyPartImpl,
 	_buildTaggedElement: (
-		self: AnatomyInstanceImpl<TSocketName, TSurfaceName>,
-		descriptor: DefTypes.TagDescriptor<TSurfaceName>
-	) -> AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TSurfaceName>,
+		self: AnatomyInstanceImpl<SocketT, TagT>,
+		descriptor: DefTypes.TagDescriptor<TagT>
+	) -> AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT>,
 }
 
 return {}
