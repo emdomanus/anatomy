@@ -13,9 +13,18 @@ local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatom
 
 export type AnatomyCategory = Types.AnatomyCategory
 export type AnatomyId = Types.AnatomyId
-export type AnatomyInstance<SocketT, TagT> = Types.AnatomyInstance<SocketT, TagT>
-export type AnatomyInstanceImpl<SocketT, TagT> = Types.AnatomyInstanceImpl<SocketT, TagT>
-export type AnatomyRole = Types.AnatomyRole
+export type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
+export type AnatomyTemplateImpl<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplateImpl<SocketT, TagT>
+export type AnatomyInstance<SocketT, TagT> = Types.AnatomyInstance<
+	AnatomyTemplate<SocketT, TagT>,
+	SocketT,
+	TagT
+>
+export type AnatomyInstanceImpl<SocketT, TagT> = Types.AnatomyInstanceImpl<
+	AnatomyTemplateImpl<SocketT, TagT>,
+	SocketT,
+	TagT
+>
 export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
 export type DescriptorMetadata = Types.DescriptorMetadata
@@ -23,18 +32,17 @@ export type InstancePolicy = Types.InstancePolicy
 export type SocketDescriptor<SocketT> = Types.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
 export type AnatomyPath = DefTypes.AnatomyPath
-export type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
+export type RecognizeConfig<SocketT, TagT> = DefTypes.RecognizeConfig<SocketT, TagT>
 
 local AnatomyInstance = {}
 AnatomyInstance.__index = AnatomyInstance
 
-local function getTemplateField(template: any, fieldName: string, methodName: string): any
-	local method = template[methodName]
-	if method ~= nil then
-		return method(template)
+local function getTagPathDelimiter<SocketT, TagT>(config: RecognizeConfig<SocketT, TagT>): string
+	if config.tagPathDelimiter == nil or config.tagPathDelimiter == "" then
+		return "."
 	end
 
-	return template[fieldName]
+	return config.tagPathDelimiter
 end
 
 local function forRootAndDescendants(root: Instance, callback: (Instance) -> ()): ()
@@ -44,9 +52,9 @@ local function forRootAndDescendants(root: Instance, callback: (Instance) -> ())
 	end
 end
 
-local function addTaggedElementToIndex<TagT>(
-	tagPrefixIndex: { [string]: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT> } },
-	element: AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT>,
+local function addTaggedElementToIndex<SocketT, TagT>(
+	tagPrefixIndex: { [string]: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<AnatomyInstanceImpl<SocketT, TagT>, TagT> } },
+	element: AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<AnatomyInstanceImpl<SocketT, TagT>, TagT>,
 	prefixes: { [string]: true }
 ): ()
 	for prefix in prefixes do
@@ -61,7 +69,7 @@ local function addTaggedElementToIndex<TagT>(
 end
 
 function AnatomyInstance.new<SocketT, TagT>(
-	template: AnatomyTemplate<SocketT, TagT>,
+	template: AnatomyTemplateImpl<SocketT, TagT>,
 	root: Instance,
 	ownsRoot: boolean?
 ): AnatomyInstance<SocketT, TagT>
@@ -69,10 +77,9 @@ function AnatomyInstance.new<SocketT, TagT>(
 
 	self._template = template
 	self._root = root
-	self._id = getTemplateField(template, "_id", "getId")
-	self._role = getTemplateField(template, "_role", "getRole")
-	self._category = getTemplateField(template, "_category", "getCategory")
-	self._metadata = getTemplateField(template, "_metadata", "getMetadata")
+	self._id = template:getId()
+	self._category = template:getCategory()
+	self._metadata = template:getMetadata()
 	self._ownsRoot = ownsRoot == true
 
 	self._sockets = {}
@@ -90,20 +97,16 @@ function AnatomyInstance.new<SocketT, TagT>(
 		addTaggedElementToIndex(self._tagPrefixIndex, element, descriptor.prefixes)
 	end
 
-	local config = (template :: any)._config
+	local config = template._config
 	if config and config.instancePolicy then
 		self:applyInstancePolicy(config.instancePolicy)
 	end
 
-	return self
+	return self :: any
 end
 
 function AnatomyInstance.getId<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): AnatomyId?
 	return self._id
-end
-
-function AnatomyInstance.getRole<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): AnatomyRole
-	return self._role
 end
 
 function AnatomyInstance.getCategory<SocketT, TagT>(
@@ -116,7 +119,7 @@ function AnatomyInstance.getRoot<SocketT, TagT>(self: AnatomyInstanceImpl<Socket
 	return self._root
 end
 
-function AnatomyInstance.getTemplate<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): any
+function AnatomyInstance.getTemplate<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): AnatomyTemplate<SocketT, TagT>
 	return self._template
 end
 
@@ -205,7 +208,7 @@ end
 function AnatomyInstance._buildSocket<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>,
 	descriptor: SocketDescriptor<SocketT>
-): AnatomySocketTypes.AnatomySocketImpl<SocketT>
+): AnatomySocketTypes.AnatomySocketImpl<AnatomyInstanceImpl<SocketT, TagT>, SocketT>
 	local target = self:_resolvePath(descriptor.path)
 	if target == nil then
 		error(`Anatomy socket "{descriptor.name}" path did not resolve under {self._root:GetFullName()}`, 2)
@@ -223,13 +226,13 @@ end
 function AnatomyInstance._buildTaggedElement<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>,
 	descriptor: TagDescriptor<TagT>
-): AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT>
+): AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<AnatomyInstanceImpl<SocketT, TagT>, TagT>
 	local instance = self:_resolvePath(descriptor.path)
 	if instance == nil then
 		error(`Anatomy tag path did not resolve under {self._root:GetFullName()}`, 2)
 	end
 
-	return AnatomyTaggedElement.fromDescriptor(self, descriptor, instance) :: any
+	return AnatomyTaggedElement.fromDescriptor(self, descriptor, instance, getTagPathDelimiter(self._template._config)) :: any
 end
 
 function AnatomyInstance.deconstruct<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): ()
@@ -253,7 +256,7 @@ function AnatomyInstance.deconstruct<SocketT, TagT>(self: AnatomyInstanceImpl<So
 		self._root:Destroy()
 	end
 
-	self._template = nil
+	self._template = nil :: any
 	self._root = nil :: any
 end
 

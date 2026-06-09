@@ -60,14 +60,8 @@ local recognizeOptions = {
 	},
 }
 
-local rigConfig = table.clone(recognizeOptions)
-rigConfig.role = "rig"
-
-local weaponConfig = table.clone(recognizeOptions)
-weaponConfig.role = "addon"
-
-local rigTemplate = Anatomy.anatomyTemplate.recognize(rigAsset, rigConfig)
-local weaponTemplate = Anatomy.anatomyTemplate.recognize(weaponAsset, weaponConfig)
+local rigTemplate = Anatomy.anatomyTemplate.recognize(rigAsset, recognizeOptions)
+local weaponTemplate = Anatomy.anatomyTemplate.recognize(weaponAsset, recognizeOptions)
 
 local rig = rigTemplate:instantiate(workspace)
 local weapon = weaponTemplate:instantiate(workspace)

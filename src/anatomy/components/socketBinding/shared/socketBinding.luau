@@ -10,6 +10,7 @@ export type MountAttachment = Types.MountAttachment
 export type SocketAttachmentChangedCallback = Types.SocketAttachmentChangedCallback
 export type SocketBinding<SocketT> = Types.SocketBinding<SocketT>
 export type SocketBindingImpl<SocketT> = Types.SocketBindingImpl<SocketT>
+export type SocketBindingSource<SocketT> = Types.SocketBindingSource<SocketT>
 export type SocketChangedCallback<SocketT> = Types.SocketChangedCallback<SocketT>
 
 local SocketBinding = {}
@@ -17,7 +18,7 @@ SocketBinding.__index = SocketBinding
 
 function SocketBinding.new<SocketT>(
 	name: SocketT,
-	source: any?,
+	source: SocketBindingSource<SocketT>?,
 	initialSocket: AnatomySocket<SocketT>?
 ): SocketBinding<SocketT>
 	local self: SocketBindingImpl<SocketT> = setmetatable({}, SocketBinding) :: any

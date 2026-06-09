@@ -13,7 +13,11 @@ local SocketMountTypes = require(script.socketMount)
 export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
 export type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
-export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>
+export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
+	AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>,
+	SocketT,
+	TagT
+>
 export type SocketBinding<SocketT> = SocketBindingTypes.SocketBinding<SocketT>
 export type SocketEndpoint = SocketEndpointTypes.SocketEndpoint
 export type MountAttachment = SocketEndpointTypes.MountAttachment

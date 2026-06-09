@@ -9,10 +9,13 @@ local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatom
 
 export type AnatomyCategory = Types.AnatomyCategory
 export type AnatomyId = Types.AnatomyId
-export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>
-export type AnatomyRole = Types.AnatomyRole
 export type AnatomyTemplate<SocketT, TagT> = Types.AnatomyTemplate<SocketT, TagT>
 export type AnatomyTemplateImpl<SocketT, TagT> = Types.AnatomyTemplateImpl<SocketT, TagT>
+export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
+	AnatomyTemplate<SocketT, TagT>,
+	SocketT,
+	TagT
+>
 export type DescriptorMetadata = Types.DescriptorMetadata
 export type RecognizeConfig<SocketT, TagT> = Types.RecognizeConfig<SocketT, TagT>
 export type SocketDescriptor<SocketT> = Types.SocketDescriptor<SocketT>
@@ -195,7 +198,6 @@ function AnatomyTemplate.new<SocketT, TagT>(
 	local self: AnatomyTemplateImpl<SocketT, TagT> = setmetatable({}, AnatomyTemplate) :: any
 
 	self._id = config.id
-	self._role = config.role
 	self._category = config.category
 	self._source = source
 	self._config = config
@@ -208,10 +210,6 @@ end
 
 function AnatomyTemplate.getId<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): AnatomyId?
 	return self._id
-end
-
-function AnatomyTemplate.getRole<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): AnatomyRole
-	return self._role
 end
 
 function AnatomyTemplate.getCategory<SocketT, TagT>(

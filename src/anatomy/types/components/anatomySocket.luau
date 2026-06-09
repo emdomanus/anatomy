@@ -20,8 +20,8 @@ export type AnatomySocket<SocketT> = SocketEndpoint & {
 	deconstruct: (self: AnatomySocket<SocketT>) -> (),
 }
 
-export type AnatomySocketImpl<SocketT> = AnatomySocket<SocketT> & {
-	_owner: any,
+export type AnatomySocketImpl<OwnerT, SocketT> = AnatomySocket<SocketT> & {
+	_owner: OwnerT?,
 	_name: SocketT,
 	_path: AnatomyPath,
 	_attachment: MountAttachment?,
@@ -29,7 +29,7 @@ export type AnatomySocketImpl<SocketT> = AnatomySocket<SocketT> & {
 	_attachmentChangedCallbacks: CallbackSet,
 	_destroyed: boolean,
 
-	_setAttachment: (self: AnatomySocketImpl<SocketT>, attachment: MountAttachment?) -> (),
+	_setAttachment: (self: AnatomySocketImpl<OwnerT, SocketT>, attachment: MountAttachment?) -> (),
 }
 
 return {}

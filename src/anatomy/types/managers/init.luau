@@ -11,9 +11,9 @@ export type AnatomyHostLayerOptions = AnatomyHostTypes.AnatomyHostLayerOptions
 export type AnatomyHostSocketQuery = AnatomyHostTypes.AnatomyHostSocketQuery
 export type AnatomyHostTagQuery = AnatomyHostTypes.AnatomyHostTagQuery
 export type AnatomyHostSocketAddress<SocketT> = AnatomyHostTypes.AnatomyHostSocketAddress<SocketT>
-export type AnatomyInstanceSocketAddress<SocketT> = AnatomyHostTypes.AnatomyInstanceSocketAddress<SocketT>
-export type AnatomyHostMountEndpoint<SocketT> = AnatomyHostTypes.AnatomyHostMountEndpoint<SocketT>
-export type AnatomyHostMountConfig<SocketT> = AnatomyHostTypes.AnatomyHostMountConfig<SocketT>
+export type AnatomyInstanceSocketAddress<SocketT, TagT> = AnatomyHostTypes.AnatomyInstanceSocketAddress<SocketT, TagT>
+export type AnatomyHostMountEndpoint<SocketT, TagT> = AnatomyHostTypes.AnatomyHostMountEndpoint<SocketT, TagT>
+export type AnatomyHostMountConfig<SocketT, TagT> = AnatomyHostTypes.AnatomyHostMountConfig<SocketT, TagT>
 export type SocketChangedCallback<SocketT> = AnatomyHostTypes.SocketChangedCallback<SocketT>
 export type TagChangedCallback<TagT> = AnatomyHostTypes.TagChangedCallback<TagT>
 

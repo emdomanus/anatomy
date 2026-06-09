@@ -48,7 +48,6 @@ local recognizeOptions = {
 }
 
 local function buildRecognizeConfig<TSocketName, TTagName>(
-	role: "rig" | "addon",
 	options: Anatomy.RecognizeOptions<TSocketName, TTagName>
 ): Anatomy.RecognizeConfig<TSocketName, TTagName>
 	return {
@@ -62,7 +61,6 @@ local function buildRecognizeConfig<TSocketName, TTagName>(
 		tagGuard = options.tagGuard,
 		instancePolicy = options.instancePolicy,
 		metadata = options.metadata,
-		role = role,
 	}
 end
 
@@ -70,14 +68,14 @@ local function recognizeRig<TSocketName, TTagName>(
 	root: Instance,
 	options: Anatomy.RecognizeOptions<TSocketName, TTagName>
 ): Anatomy.AnatomyTemplate<TSocketName, TTagName>
-	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig("rig", options))
+	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig(options))
 end
 
 local function recognizeAddon<TSocketName, TTagName>(
 	root: Instance,
 	options: Anatomy.RecognizeOptions<TSocketName, TTagName>
 ): Anatomy.AnatomyTemplate<TSocketName, TTagName>
-	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig("addon", options))
+	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig(options))
 end
 
 local function wrap<TSocketName, TTagName>(
@@ -417,7 +415,6 @@ end
 local function testRecognitionAndPolicy(): ()
 	local template = makeTemplate("rig", "UnitRigPolicy", Color3.fromRGB(50, 180, 255), CFrame.new(-8, 2, 0))
 
-	expect(template:getRole() == "rig", "Rig template role should be rig")
 	expect(countDictionary(template:getSocketDescriptors()) == 4, "Rig should expose four sockets")
 	expect(#template:getTagDescriptors() == 2, "Rig should expose two tagged elements")
 

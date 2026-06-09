@@ -10,7 +10,6 @@ local ManagerTypes = require(script.managers)
 -- Definition Types
 --------------------------------------------------------------------------------
 
-export type AnatomyRole = DefTypes.AnatomyRole
 export type AnatomyCategory = DefTypes.AnatomyCategory
 export type AnatomyId = DefTypes.AnatomyId
 export type LayerId = DefTypes.LayerId
@@ -51,9 +50,9 @@ export type AnatomyHostLayerOptions = ManagerTypes.AnatomyHostLayerOptions
 export type AnatomyHostSocketQuery = ManagerTypes.AnatomyHostSocketQuery
 export type AnatomyHostTagQuery = ManagerTypes.AnatomyHostTagQuery
 export type AnatomyHostSocketAddress<SocketT> = ManagerTypes.AnatomyHostSocketAddress<SocketT>
-export type AnatomyInstanceSocketAddress<SocketT> = ManagerTypes.AnatomyInstanceSocketAddress<SocketT>
-export type AnatomyHostMountEndpoint<SocketT> = ManagerTypes.AnatomyHostMountEndpoint<SocketT>
-export type AnatomyHostMountConfig<SocketT> = ManagerTypes.AnatomyHostMountConfig<SocketT>
+export type AnatomyInstanceSocketAddress<SocketT, TagT> = ManagerTypes.AnatomyInstanceSocketAddress<SocketT, TagT>
+export type AnatomyHostMountEndpoint<SocketT, TagT> = ManagerTypes.AnatomyHostMountEndpoint<SocketT, TagT>
+export type AnatomyHostMountConfig<SocketT, TagT> = ManagerTypes.AnatomyHostMountConfig<SocketT, TagT>
 export type TagChangedCallback<TagT> = ManagerTypes.TagChangedCallback<TagT>
 
 return {}

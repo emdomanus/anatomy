@@ -4,12 +4,17 @@
 
 local Types = require(script.Parent.Parent.Parent.Parent.types.managers.anatomyHost)
 local AnatomyInstanceTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyInstance)
+local AnatomyTemplateTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTemplate)
 
 export type AnatomyCategory = Types.AnatomyCategory
 export type AnatomyHostImpl<SocketT, TagT> = Types.AnatomyHostImpl<SocketT, TagT>
 export type AnatomyHostLayer<SocketT, TagT> = Types.AnatomyHostLayer<SocketT, TagT>
 export type AnatomyHostLayerImpl<SocketT, TagT> = Types.AnatomyHostLayerImpl<SocketT, TagT>
-export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>
+export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
+	AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>,
+	SocketT,
+	TagT
+>
 export type LayerId = Types.LayerId
 
 local AnatomyHostLayer = {}

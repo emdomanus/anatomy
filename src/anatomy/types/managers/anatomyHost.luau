@@ -6,6 +6,7 @@ local CallbackSetTypes = require(script.Parent.Parent.Parent.utils.callbackSet)
 local AnatomyInstanceTypes = require(script.Parent.Parent.components.anatomyInstance)
 local AnatomySocketTypes = require(script.Parent.Parent.components.anatomySocket)
 local AnatomyTaggedElementTypes = require(script.Parent.Parent.components.anatomyTaggedElement)
+local AnatomyTemplateTypes = require(script.Parent.Parent.components.anatomyTemplate)
 local SocketBindingTypes = require(script.Parent.Parent.components.socketBinding)
 local SocketEndpointTypes = require(script.Parent.Parent.components.socketEndpoint)
 local SocketMountTypes = require(script.Parent.Parent.components.socketMount)
@@ -42,7 +43,7 @@ export type AnatomyHostLayer<SocketT, TagT> = {
 	id: LayerId,
 	getInstance: (
 		self: AnatomyHostLayer<SocketT, TagT>
-	) -> AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>,
+	) -> AnatomyInstanceTypes.AnatomyInstance<AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>, SocketT, TagT>,
 	getPriority: (self: AnatomyHostLayer<SocketT, TagT>) -> number,
 	setPriority: (self: AnatomyHostLayer<SocketT, TagT>, priority: number) -> (),
 	remove: (self: AnatomyHostLayer<SocketT, TagT>) -> (),
@@ -59,21 +60,21 @@ export type AnatomyHostSocketAddress<SocketT> = AnatomyHostSocketQuery & {
 	socket: SocketT,
 }
 
-export type AnatomyInstanceSocketAddress<SocketT> = {
-	instance: AnatomyInstanceTypes.AnatomyInstance<SocketT, any>,
+export type AnatomyInstanceSocketAddress<SocketT, TagT> = {
+	instance: AnatomyInstanceTypes.AnatomyInstance<AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>, SocketT, TagT>,
 	socket: SocketT,
 }
 
-export type AnatomyHostMountEndpoint<SocketT> =
+export type AnatomyHostMountEndpoint<SocketT, TagT> =
 	AnatomyHostSocketAddress<SocketT>
-	| AnatomyInstanceSocketAddress<SocketT>
+	| AnatomyInstanceSocketAddress<SocketT, TagT>
 	| AnatomySocketTypes.AnatomySocket<SocketT>
 	| SocketBindingTypes.SocketBinding<SocketT>
 	| Attachment
 
-export type AnatomyHostMountConfig<SocketT> = {
-	from: AnatomyHostMountEndpoint<SocketT>,
-	to: AnatomyHostMountEndpoint<SocketT>,
+export type AnatomyHostMountConfig<SocketT, TagT> = {
+	from: AnatomyHostMountEndpoint<SocketT, TagT>,
+	to: AnatomyHostMountEndpoint<SocketT, TagT>,
 	options: SocketMountOptions?,
 }
 
@@ -83,7 +84,7 @@ export type TagChangedCallback<TagT> = (AnatomyTaggedElementTypes.AnatomyTaggedE
 export type AnatomyHost<SocketT, TagT> = {
 	push: (
 		self: AnatomyHost<SocketT, TagT>,
-		instance: AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>,
+		instance: AnatomyInstanceTypes.AnatomyInstance<AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>, SocketT, TagT>,
 		options: AnatomyHostLayerOptions?
 	) -> AnatomyHostLayer<SocketT, TagT>,
 	remove: (self: AnatomyHost<SocketT, TagT>, layerId: LayerId) -> boolean,
@@ -134,14 +135,14 @@ export type AnatomyHost<SocketT, TagT> = {
 
 	mount: (
 		self: AnatomyHost<SocketT, TagT>,
-		config: AnatomyHostMountConfig<SocketT>
+		config: AnatomyHostMountConfig<SocketT, TagT>
 	) -> SocketMount,
 	deconstruct: (self: AnatomyHost<SocketT, TagT>) -> (),
 }
 
 export type AnatomyHostLayerImpl<SocketT, TagT> = AnatomyHostLayer<SocketT, TagT> & {
 	_host: AnatomyHostImpl<SocketT, TagT>,
-	_instance: AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>,
+	_instance: AnatomyInstanceTypes.AnatomyInstance<AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>, SocketT, TagT>,
 	_priority: number,
 	_category: AnatomyCategory?,
 	_allowSocketOverrides: boolean,
@@ -175,7 +176,7 @@ export type AnatomyHostImpl<SocketT, TagT> = AnatomyHost<SocketT, TagT> & {
 	_refreshAllWatchedPrefixes: (self: AnatomyHostImpl<SocketT, TagT>) -> (),
 	_normalizeEndpoint: (
 		self: AnatomyHostImpl<SocketT, TagT>,
-		endpoint: AnatomyHostMountEndpoint<SocketT>
+		endpoint: AnatomyHostMountEndpoint<SocketT, TagT>
 	) -> SocketEndpoint,
 }
 

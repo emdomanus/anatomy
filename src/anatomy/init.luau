@@ -5,7 +5,6 @@
 
 local Types = require(script.types)
 
-export type AnatomyRole = Types.AnatomyRole
 export type AnatomyCategory = Types.AnatomyCategory
 export type AnatomyId = Types.AnatomyId
 export type LayerId = Types.LayerId
@@ -53,9 +52,9 @@ export type AnatomyHostLayerOptions = Types.AnatomyHostLayerOptions
 export type AnatomyHostSocketQuery = Types.AnatomyHostSocketQuery
 export type AnatomyHostTagQuery = Types.AnatomyHostTagQuery
 export type AnatomyHostSocketAddress<SocketT> = Types.AnatomyHostSocketAddress<SocketT>
-export type AnatomyInstanceSocketAddress<SocketT> = Types.AnatomyInstanceSocketAddress<SocketT>
-export type AnatomyHostMountEndpoint<SocketT> = Types.AnatomyHostMountEndpoint<SocketT>
-export type AnatomyHostMountConfig<SocketT> = Types.AnatomyHostMountConfig<SocketT>
+export type AnatomyInstanceSocketAddress<SocketT, TagT> = Types.AnatomyInstanceSocketAddress<SocketT, TagT>
+export type AnatomyHostMountEndpoint<SocketT, TagT> = Types.AnatomyHostMountEndpoint<SocketT, TagT>
+export type AnatomyHostMountConfig<SocketT, TagT> = Types.AnatomyHostMountConfig<SocketT, TagT>
 export type TagChangedCallback<TagT> = Types.TagChangedCallback<TagT>
 
 local AnatomyHostModule = require(script.managers.anatomyHost.shared.anatomyHost)

@@ -3,10 +3,9 @@
 --!native
 
 --------------------------------------------------------------------------------
--- Names / Roles
+-- Names
 --------------------------------------------------------------------------------
 
-export type AnatomyRole = "rig" | "addon"
 export type AnatomyCategory = string
 export type AnatomyId = string
 export type LayerId = string
@@ -69,9 +68,6 @@ export type RecognizeOptions<SocketT, TagT> = {
 
 	metadata: DescriptorMetadata?,
 }
-
-export type RecognizeConfig<SocketT, TagT> = RecognizeOptions<SocketT, TagT> & {
-	role: AnatomyRole,
-}
+export type RecognizeConfig<SocketT, TagT> = RecognizeOptions<SocketT, TagT>
 
 return {}

@@ -10,6 +10,7 @@ local SocketMount = require(script.Parent.Parent.Parent.Parent.components.socket
 local AnatomyInstanceTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyInstance)
 local AnatomySocketTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomySocket)
 local AnatomyTaggedElementTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTaggedElement)
+local AnatomyTemplateTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTemplate)
 local SocketBindingTypes = require(script.Parent.Parent.Parent.Parent.types.components.socketBinding)
 local Types = require(script.Parent.Parent.Parent.Parent.types.managers.anatomyHost)
 
@@ -18,12 +19,16 @@ export type AnatomyHostImpl<SocketT, TagT> = Types.AnatomyHostImpl<SocketT, TagT
 export type AnatomyHostLayer<SocketT, TagT> = Types.AnatomyHostLayer<SocketT, TagT>
 export type AnatomyHostLayerImpl<SocketT, TagT> = Types.AnatomyHostLayerImpl<SocketT, TagT>
 export type AnatomyHostLayerOptions = Types.AnatomyHostLayerOptions
-export type AnatomyHostMountConfig<SocketT> = Types.AnatomyHostMountConfig<SocketT>
-export type AnatomyHostMountEndpoint<SocketT> = Types.AnatomyHostMountEndpoint<SocketT>
+export type AnatomyHostMountConfig<SocketT, TagT> = Types.AnatomyHostMountConfig<SocketT, TagT>
+export type AnatomyHostMountEndpoint<SocketT, TagT> = Types.AnatomyHostMountEndpoint<SocketT, TagT>
 export type AnatomyHostOptions<SocketT> = Types.AnatomyHostOptions<SocketT>
 export type AnatomyHostTagQuery = Types.AnatomyHostTagQuery
 export type AnatomyHostSocketQuery = Types.AnatomyHostSocketQuery
-export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<SocketT, TagT>
+export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
+	AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>,
+	SocketT,
+	TagT
+>
 export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
 export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 export type LayerId = Types.LayerId
@@ -454,7 +459,7 @@ function AnatomyHost.socket<SocketT, TagT>(
 	local queryCopy = copyQuery(query)
 	local source = {
 		bindSocket = function(
-			_source: any,
+			_source: SocketBindingTypes.SocketBindingSource<SocketT>,
 			socketName: SocketT,
 			callback: SocketChangedCallback<SocketT>,
 			runInitially: boolean?
@@ -471,7 +476,7 @@ end
 
 function AnatomyHost.mount<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
-	config: AnatomyHostMountConfig<SocketT>
+	config: AnatomyHostMountConfig<SocketT, TagT>
 ): SocketMount
 	local mount = SocketMount.new(
 		self:_normalizeEndpoint(config.from),
@@ -593,7 +598,7 @@ end
 
 function AnatomyHost._normalizeEndpoint<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
-	endpoint: AnatomyHostMountEndpoint<SocketT>
+	endpoint: AnatomyHostMountEndpoint<SocketT, TagT>
 ): SocketEndpoint
 	local endpointValue = endpoint :: any
 	if typeof(endpointValue) == "Instance" and endpointValue:IsA("Attachment") then

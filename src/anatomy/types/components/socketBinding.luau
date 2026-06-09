@@ -13,6 +13,14 @@ export type SocketAttachmentChangedCallback = SocketEndpointTypes.SocketAttachme
 export type SocketEndpoint = SocketEndpointTypes.SocketEndpoint
 
 export type SocketChangedCallback<SocketT> = (AnatomySocketTypes.AnatomySocket<SocketT>?) -> ()
+export type SocketBindingSource<SocketT> = {
+	bindSocket: (
+		self: SocketBindingSource<SocketT>,
+		name: SocketT,
+		callback: SocketChangedCallback<SocketT>,
+		runInitially: boolean?
+	) -> () -> (),
+}
 
 export type SocketBinding<SocketT> = SocketEndpoint & {
 	getName: (self: SocketBinding<SocketT>) -> SocketT,
@@ -31,7 +39,7 @@ export type SocketBindingImpl<SocketT> = SocketBinding<SocketT> & {
 	_socketChangedCallbacks: CallbackSet,
 	_attachmentChangedCallbacks: CallbackSet,
 	_socketAttachmentDisconnect: (() -> ())?,
-	_source: any?,
+	_source: SocketBindingSource<SocketT>?,
 	_sourceDisconnect: (() -> ())?,
 	_destroyed: boolean,
 

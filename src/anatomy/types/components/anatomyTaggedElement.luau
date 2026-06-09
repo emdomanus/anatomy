@@ -15,8 +15,8 @@ export type AnatomyTaggedElement<TagT> = {
 	deconstruct: (self: AnatomyTaggedElement<TagT>) -> (),
 }
 
-export type AnatomyTaggedElementImpl<TagT> = AnatomyTaggedElement<TagT> & {
-	_owner: any,
+export type AnatomyTaggedElementImpl<OwnerT, TagT> = AnatomyTaggedElement<TagT> & {
+	_owner: OwnerT?,
 	_path: AnatomyPath,
 	_instance: Instance?,
 	_tags: { [TagT]: true },

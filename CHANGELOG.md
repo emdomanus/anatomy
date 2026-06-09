@@ -5,6 +5,8 @@
 - Removed the surface API and surface descriptors.
 - Removed the part API and part descriptors; use hierarchical tags for named or
   semantic element lookup.
+- Removed template/instance role metadata; hosts, layers, sockets, and tags carry
+  runtime semantics now.
 - Added hierarchical tags with `tagsAttribute`, `tagDelimiter`,
   `tagPathDelimiter`, and `tagGuard`.
 - Added `TagDescriptor`, `AnatomyTaggedElement`, `template:getTagDescriptors()`,
