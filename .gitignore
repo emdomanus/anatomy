@@ -8,3 +8,6 @@ dev-sourcemap.json
 roblox_packages/
 luau_packages/
 lune_packages/
+node_modules/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
