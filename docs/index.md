@@ -12,7 +12,7 @@ Anatomy owns visual anatomy discovery and mounting primitives:
 - cloning or wrapping a recognized model as a live anatomy instance;
 - aggregating multiple anatomy instances into a host;
 - resolving sockets and tag queries across host layers;
-- maintaining socket-to-socket mounts as layers change.
+- providing explicit attachment mounts that rendering owners can update as layers change.
 
 Anatomy does not own gameplay state, replication, skills, teams, collision capsules, world policy, or VFX lifetime policy.
 
@@ -59,5 +59,5 @@ The next useful docs pass should expand the [Types](/types) page with one sectio
 
 - recognition types;
 - template and instance types;
-- host layer and query types;
-- socket binding and mount types.
+- host layer and positional selection APIs;
+- socket watcher and mount types.

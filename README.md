@@ -25,9 +25,11 @@ Installed consumers continue to require their Pesde-generated Anatomy package li
 - `AnatomyInstance` is a live clone or wrapped model resolved against a template.
 - `AnatomyHost` layers one or more anatomy instances, usually a rig plus addons,
   and resolves sockets and tags reactively.
-- `SocketBinding` is a reactive endpoint returned by `host:socket(...)`.
-- `SocketMount` connects two endpoints with a `RigidConstraint` and updates when
-  reactive endpoints retarget.
+- `AnatomySocket` is one concrete socket with an always-present `Attachment`.
+- `SocketWatcher` follows a host socket address and returns a socket or `nil`.
+  Create it with `host:watchSocket(name, layerId?, includeOverrides?)`.
+- `SocketMount` owns one `RigidConstraint` between explicit attachments. The caller
+  controls its attachments, enabled state, and parent; watcher wiring stays with that caller.
 
 Sockets are explicit Roblox `Attachment` instances with a configured socket
 attribute. Tags can be marked with a configured tags attribute on any instance.
@@ -85,18 +87,24 @@ host:push(weapon, {
 	priority = 10,
 })
 
-local weaponMount = host:mount({
-	from = {
-		socket = "weaponGrip",
-		layerId = "weapon",
-	},
-	to = {
-		socket = "rightGrip",
-	},
-	options = {
-		name = "WeaponToRightGrip",
-	},
+local weaponWatcher = host:watchSocket("weaponGrip", "weapon")
+local handWatcher = host:watchSocket("rightGrip")
+local weaponMount = host:mount(nil, nil, {
+    name = "WeaponToRightGrip",
+    parent = workspace,
 })
+local function updateMount()
+    local from = weaponWatcher:getSocket()
+    local to = handWatcher:getSocket()
+    weaponMount:setAttachments(
+        if from then from:getAttachment() else nil,
+        if to then to:getAttachment() else nil
+    )
+    -- The rendering owner can also hide/unparent the visual when either socket is nil.
+end
+local disconnectWeapon = weaponWatcher:bindSocketChanged(updateMount)
+local disconnectHand = handWatcher:bindSocketChanged(updateMount)
+updateMount()
 
 for _, element in host:getByTag("effect") do
 	local instance = element:getInstance()
@@ -107,9 +115,72 @@ print(weaponMount:isConnected())
 ```
 
 When the `weapon` layer is removed and another weapon layer is pushed with the
-same id, any mount or binding that targets that layer will retarget automatically.
+same id, watchers targeting that address select the replacement socket. The caller above
+updates the mount explicitly in response.
 Preview and editor tooling can use `host:getSocketNames()`, `host:getSockets()`,
 or `host:getByTag(prefix)` to inspect the currently resolved socket and tag sets.
+
+## Watching and ownership
+
+```luau
+local watcher = host:watchSocket("rightGrip") -- normal selection across all layers
+local disconnect = watcher:bindSocketChanged(function(socket)
+    local attachment = if socket then socket:getAttachment() else nil
+    -- Update the consumer from attachment.
+end, true)
+
+-- During owner cleanup:
+disconnect()
+disconnectWeapon()
+disconnectHand()
+weaponMount:deconstruct()
+weaponWatcher:deconstruct()
+handWatcher:deconstruct()
+watcher:deconstruct()
+host:remove("weapon")
+host:remove("rig")
+weapon:deconstruct()
+rig:deconstruct()
+host:deconstruct()
+```
+
+Watchers have one socket-change event; concrete sockets have no attachment-change event.
+`socket:getAttachment()` returns `Attachment`, never `nil`. A destroyed socket is a retired
+borrowed handle and rejects attachment access. Missing addresses are represented by a watcher's
+`nil` socket. External descendant destruction/streaming is not observed.
+
+Mounts borrow attachment references and own only their constraint. They never subscribe to
+watchers. Owners release watcher subscriptions before destroying the mount or its host; host
+teardown destroys host-created mounts and releases its remaining watchers. Remove instances
+from all hosts and clear/destroy mounts referencing their attachments before instance teardown.
+
+## Explicit mounts
+
+```luau
+local mount = Anatomy.socketMount.new(fromSocket:getAttachment(), toSocket:getAttachment(), {
+    parent = constraintOwner,
+})
+mount:setAttachments(nil, toSocket:getAttachment()) -- disabled while a side is missing
+mount:setAttachments(fromSocket:getAttachment(), toSocket:getAttachment())
+mount:setEnabled(false) -- remains disabled even across attachment changes
+mount:setParent(nil) -- stays unparented until explicitly parented again
+mount:deconstruct()
+```
+
+Construction always creates one constraint, including when either initial attachment is nil.
+Omitting `options.parent` leaves it unparented. `setAttachments` reuses that constraint and
+never changes its parent. Clearing a side disables it; restoring both honors the caller's
+requested enabled state. `setParent` affects the constraint only, not a rendered model.
+`isConnected()` reports configured enabled/two-attachment state, not engine ancestry or
+physical activity. `getConstraint()` exposes the constraint for inspection; attachment,
+enabled, and parent writes should go through the mount. `refresh()` and polymorphic mount
+inputs were removed. There is no reactive mount subclass or automatic rendering policy.
+
+Socket selectors are positional: `getSocket(name, layerId?, includeOverrides?)`,
+`getSockets(layerId?, includeOverrides?)`, and `getSocketNames(layerId?, includeOverrides?)`.
+With a layer id, only that layer is considered. Without one, overrides default to enabled;
+passing `nil, false` selects the first matching layer. Tag lookup takes `getByTag(prefix, layerId?)`.
+Query/address tables and `socketEndpoint.fromAttachment` are no longer part of the API.
 
 ## Tags
 
@@ -144,7 +215,7 @@ end, true)
 
 ## VFX And Preview Tools
 
-VFX should usually depend on an anatomy host, socket endpoint, or tagged element,
+VFX should usually depend on an anatomy host, socket watcher, concrete socket, or tagged element,
 not a full gameplay character object. A gameplay visualizer can provide the live
 host, while an editor preview, viewport UI, or character creator can construct a
 small preview host from stand-in rig/addon assets.
@@ -159,8 +230,8 @@ That keeps effects portable:
   gameplay state.
 
 The VFX layer can require Anatomy when it needs to construct hosts, inspect
-sockets or tags, or create mounts. For one-shot effects that are merely handed an
-endpoint or tagged element by a visualizer, the effect does not need to know how
+sockets or tags, or create mounts. For one-shot effects that are merely handed a
+socket, watcher, or tagged element by a visualizer, the effect does not need to know how
 the host was built.
 
 ## Boundaries
@@ -177,7 +248,7 @@ It does not own:
 - world or place policy;
 - VFX lifetime rules.
 
-Those systems should pass Anatomy the models, hosts, endpoints, or tagged
+Those systems should pass Anatomy the models, hosts, sockets, watchers, or tagged
 elements that Anatomy can resolve and mount.
 
 ## Development

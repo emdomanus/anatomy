@@ -18,7 +18,7 @@ Template  --recognize/crawl once-->  descriptors
 Instance  --resolve paths-->  sockets, tagged elements
    | host:push()
    v
-Host      --layer aggregate--> sockets, tag queries, bindings, mounts
+Host      --layer aggregate--> sockets, tag queries, watchers, mounts
 ```
 
 ## Template
@@ -60,47 +60,60 @@ instances; callers own instance lifetime.
 Socket resolution walks layers in order. The first socket wins unless later
 layers are allowed to override sockets. Socket APIs include:
 
-- `getSocket(name, query?)`
-- `getSockets(query?)`
-- `getSocketNames(query?)`
-- `bindSocket(name, callback, runInitially?)`
-- `socket(name, query?)`
+- `getSocket(name, layerId?, includeOverrides?)`
+- `getSockets(layerId?, includeOverrides?)`
+- `getSocketNames(layerId?, includeOverrides?)`
+- `bindSocket(name, callback, runInitially?, layerId?, includeOverrides?)`
+- `watchSocket(name, layerId?, includeOverrides?)`
 
 Tag queries collect matching tagged elements across layers:
 
-- `getByTag(prefix, query?)`
+- `getByTag(prefix, layerId?)`
 - `bindByTag(prefix, onAdded, onRemoved, runInitially?)`
 
 Watched tag prefixes are materialized in `_resolvedByPrefix` and refreshed when
 layers are pushed, removed, or reprioritized.
 
-## Mounts
+## Sockets, watchers, and mounts
 
-Mounts remain socket-only.
+An `AnatomySocket` identifies one concrete attachment. `getAttachment()` returns `Attachment`;
+there is no attachment-change subscription or separate endpoint protocol.
 
-`host:mount(config)` normalizes endpoints from:
+`host:watchSocket(name, layerId?, includeOverrides?)` returns a caller-owned `SocketWatcher`.
+It tracks a host address and publishes the selected `AnatomySocket` or `nil` through
+`bindSocketChanged(callback, runInitially?)`. Its internal constructor receives the host directly
+through `SocketSubscription`; no source adapter or query snapshot is allocated. The host stores
+scalar selector fields in its subscription record. A watcher has one callback set.
 
-- an `Attachment`
-- an `AnatomySocket`
-- a `SocketBinding`
-- `{ instance, socket }`
-- `{ socket, ...query }`
+`host:mount(from, to, options?)` and `Anatomy.socketMount.new(from, to, options?)` accept
+`Attachment?` for both sides. A mount eagerly owns exactly one `RigidConstraint`, including
+when constructed empty. There are no socket/watcher imports, input unions, subscriptions,
+retargeting callbacks, retained query/options records, or lazy constraint state inside it.
 
-The resulting `SocketMount` maintains a `RigidConstraint` between the current
-attachments of the two endpoints.
+Callers use `setAttachments(from, to)`, `setEnabled(enabled)`, and `setParent(parent)`.
+A missing attachment disables the constraint; restoring both respects the requested enabled
+state. The parent is supplied explicitly at construction or through `setParent`; attachment
+updates never infer or restore a parent. The constraint is reused until idempotent teardown.
+`isConnected()` describes configured state, not physical activity or ancestry.
+
+Rendering owners may observe watchers, read each selected socket's attachment, update the mount,
+and hide/unparent their model as appropriate. They own the disconnect functions and release them
+before destroying the mount/host. `dev/client/bindMountWatchers.luau` demonstrates this external
+wiring and is exercised by the contract suite; it is not a published reactive-mount abstraction.
 
 ## Ownership
 
-```text
-Caller
-  owns AnatomyTemplate
-  owns AnatomyInstance(s)
-    owns AnatomySocket / AnatomyTaggedElement
-  owns AnatomyHost
-    owns AnatomyHostLayer(s)
-    owns SocketBinding(s)
-    owns SocketMount(s)
-```
+- Callers own templates, instances, hosts, and returned watchers/mounts.
+- Instances own their sockets and tagged elements; consumers receive borrowed views.
+- Hosts own layer registrations and track outstanding watchers/host-created mounts for teardown.
+- Mounts borrow attachments and own their constraint. Callers own watcher subscriptions;
+  mount destruction has no effect on watchers or subscriptions.
+- Watcher destruction disconnects from the host and clears a selected socket to `nil` for listeners.
+
+Remove an instance from every host before deconstructing it. Clear or destroy mounts using its
+attachments before deconstructing it. Release caller-owned subscriptions before mount/host teardown. Those rules ensure watchers publish removal while sockets remain
+valid. A retired socket rejects attachment access; it does not become an empty socket. Host teardown
+does not destroy the instances it layers. External engine destruction and streaming are not observed.
 
 ## Notes
 
@@ -123,21 +136,16 @@ plus an immutable registration ordinal, not the host implementation. Socket and 
 objects do not retain recursive parent implementation types. Instances hold child `Owned`
 views and expose borrowed public views.
 
-Mounts deconstruct only bindings they created while normalizing host socket addresses.
-Externally supplied endpoints remain borrowed. Endpoint destruction publishes a terminal nil
-attachment before clearing subscribers. Creating new subscriptions/resources after teardown fails.
-Remove a layer before destroying its borrowed instance if tag-removal notifications are needed;
-the host observes layer membership, not external instance lifetime or descendant streaming.
-
 ## Verification
 
 `pwsh -NoProfile -File scripts/verify/run.ps1 -Check tests` runs actual package modules
 in Lune with Roblox datatype support, without writing generated source. Its constraint sink
 is simulated because Lune 0.10.5 cannot clear reflected attachment references to nil.
 It covers guard rejection, inferred-constructor callers, prefix queries, descriptor snapshots,
-stale handles, terminal attachment notification, and mount-owned subscription release.
+stale handles, socket selection/removal, explicit constraint updates, stable parenting,
+requested enabled state, and cleanup of externally wired watcher subscriptions.
 The Studio harness retains its six original assertion groups and adds these contract cases.
 Studio physics, UI, and real constraint lifecycle still require explicit Studio verification.
 
-Allocation optimization is a separate checkpoint. This migration preserves collection snapshot
-APIs and the existing binding adapters; ports are structural views with no adapter allocations.
+Broader allocation optimization is a separate checkpoint. Collection snapshots, recognition,
+instance construction options, and host refresh allocations retain their existing behavior.

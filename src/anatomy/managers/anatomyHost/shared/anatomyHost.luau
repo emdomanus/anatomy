@@ -1,16 +1,11 @@
 --!strict
 --!optimize 2
 
-local SocketEndpointLifecycleTypes = require(
-	script.Parent.Parent.Parent.Parent.types.ports.components.socketEndpoint.shared.socketEndpointLifecycle
-)
 local CallbackSet = require(script.Parent.Parent.Parent.Parent.utils.callbackSet.shared.callbackSet)
 local AnatomyHostLayer =
 	require(script.Parent.Parent.Parent.Parent.components.anatomyHostLayer.shared.anatomyHostLayer)
-local SocketBinding =
-	require(script.Parent.Parent.Parent.Parent.components.socketBinding.shared.socketBinding)
-local SocketEndpoint =
-	require(script.Parent.Parent.Parent.Parent.components.socketEndpoint.shared.socketEndpoint)
+local SocketWatcher =
+	require(script.Parent.Parent.Parent.Parent.components.socketWatcher.shared.socketWatcher)
 local SocketMount =
 	require(script.Parent.Parent.Parent.Parent.components.socketMount.shared.socketMount)
 local AnatomyInstanceTypes = require(
@@ -24,8 +19,8 @@ local AnatomyTaggedElementTypes = require(
 local AnatomyTemplateTypes = require(
 	script.Parent.Parent.Parent.Parent.types.components.anatomyTemplate.shared.anatomyTemplate
 )
-local SocketBindingTypes =
-	require(script.Parent.Parent.Parent.Parent.types.components.socketBinding.shared.socketBinding)
+local SocketWatcherTypes =
+	require(script.Parent.Parent.Parent.Parent.types.components.socketWatcher.shared.socketWatcher)
 local AnatomyHostTypes =
 	require(script.Parent.Parent.Parent.Parent.types.managers.anatomyHost.shared.anatomyHost)
 local AnatomyHostLayerTypes = require(
@@ -33,11 +28,6 @@ local AnatomyHostLayerTypes = require(
 )
 
 type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
-type SocketBindingSource<SocketT> = SocketBindingTypes.SocketBindingSource<SocketT>
-type AnatomyHostMountEndpointFields<SocketT, TagT> =
-	AnatomyHostTypes.AnatomyHostMountEndpointFields<SocketT, TagT>
-
-type SocketEndpointLifecycle = SocketEndpointLifecycleTypes.SocketEndpointLifecycle
 
 type AnatomyHost<SocketT, TagT> = AnatomyHostTypes.AnatomyHost<SocketT, TagT>
 type AnatomyHostImpl<SocketT, TagT> = AnatomyHostTypes.AnatomyHostImpl<SocketT, TagT>
@@ -47,14 +37,7 @@ type AnatomyHostLayerOwned<SocketT, TagT> = AnatomyHostLayerTypes.AnatomyHostLay
 	TagT
 >
 type AnatomyHostLayerOptions = AnatomyHostTypes.AnatomyHostLayerOptions
-type AnatomyHostMountConfig<SocketT, TagT> = AnatomyHostTypes.AnatomyHostMountConfig<SocketT, TagT>
-type AnatomyHostMountEndpoint<SocketT, TagT> = AnatomyHostTypes.AnatomyHostMountEndpoint<
-	SocketT,
-	TagT
->
 type AnatomyHostOptions<SocketT, TagT> = AnatomyHostTypes.AnatomyHostOptions<SocketT, TagT>
-type AnatomyHostTagQuery = AnatomyHostTypes.AnatomyHostTagQuery
-type AnatomyHostSocketQuery = AnatomyHostTypes.AnatomyHostSocketQuery
 type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
 	AnatomyTemplate<SocketT, TagT>,
 	SocketT,
@@ -63,9 +46,9 @@ type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
 type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
 type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 type LayerId = AnatomyHostTypes.LayerId
-type SocketBinding<SocketT> = SocketBindingTypes.SocketBinding<SocketT>
+type SocketWatcher<SocketT> = SocketWatcherTypes.SocketWatcher<SocketT>
 type SocketChangedCallback<SocketT> = AnatomyHostTypes.SocketChangedCallback<SocketT>
-type SocketEndpoint = AnatomyHostTypes.SocketEndpoint
+type SocketMountOptions = AnatomyHostTypes.SocketMountOptions
 type SocketMount = AnatomyHostTypes.SocketMount
 type TagChangedCallback<TagT> = AnatomyHostTypes.TagChangedCallback<TagT>
 
@@ -136,10 +119,10 @@ end
 local function collectTaggedElements<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string,
-	query: AnatomyHostTagQuery?
+	layerId: LayerId?
 ): { AnatomyTaggedElement<TagT> }
-	if query ~= nil and query.layerId ~= nil then
-		local layer = self._layers[query.layerId]
+	if layerId ~= nil then
+		local layer = self._layers[layerId]
 		if layer == nil then
 			return {}
 		end
@@ -182,52 +165,10 @@ local function tagSetToList<TagT>(
 	return elements
 end
 
-local function copyQuery(query: AnatomyHostSocketQuery?): AnatomyHostSocketQuery?
-	if query == nil then
-		return nil
-	end
-
-	return {
-		layerId = query.layerId,
-		includeOverrides = query.includeOverrides,
-	}
-end
-
 local function assertSocketNameAllowed<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>, name: SocketT): ()
 	local guard = self._socketNameGuard
 	if guard(name) ~= name then
 		error(`Anatomy socket name "{name}" is not allowed by this host`, 3)
-	end
-end
-
-local function bindSocketQuery<SocketT, TagT>(
-	host: AnatomyHostImpl<SocketT, TagT>,
-	name: SocketT,
-	query: AnatomyHostSocketQuery?,
-	callback: SocketChangedCallback<SocketT>,
-	runInitially: boolean?
-): () -> ()
-	assertSocketNameAllowed(host, name)
-
-	if query == nil then
-		return host:bindSocket(name, callback, runInitially)
-	end
-
-	local current = host:_resolveSocket(name, query)
-	local entry = {
-		name = name,
-		query = copyQuery(query),
-		callback = callback,
-		current = current,
-	}
-	host._socketQueryCallbacks[entry] = true
-
-	if runInitially == true then
-		callback(current)
-	end
-
-	return function()
-		host._socketQueryCallbacks[entry] = nil
 	end
 end
 
@@ -248,7 +189,7 @@ local function new<SocketT, TagT>(options: AnatomyHostOptions<SocketT, TagT>): A
 	self._socketQueryCallbacks = {}
 	self._tagPrefixCallbacks = {}
 	self._resolvedByPrefix = {}
-	self._bindings = setmetatable({}, { __mode = "k" })
+	self._watchers = setmetatable({}, { __mode = "k" })
 	self._mounts = setmetatable({}, { __mode = "k" })
 	self._nextLayerOrdinal = 1
 	self._destroyed = false
@@ -378,12 +319,13 @@ end
 
 function AnatomyHost.getSocketNames<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
-	query: AnatomyHostSocketQuery?
+	layerId: LayerId?,
+	includeOverrides: boolean?
 ): { SocketT }
 	local names: { [SocketT]: boolean } = {}
 
-	if query ~= nil and query.layerId ~= nil then
-		local layer = self._layers[query.layerId]
+	if layerId ~= nil then
+		local layer = self._layers[layerId]
 		if layer == nil then
 			return {}
 		end
@@ -396,7 +338,7 @@ function AnatomyHost.getSocketNames<SocketT, TagT>(
 	end
 
 	for name in collectSocketNames(self) do
-		if self:_resolveSocket(name, query) ~= nil then
+		if self:_resolveSocket(name, layerId, includeOverrides) ~= nil then
 			names[name] = true
 		end
 	end
@@ -406,12 +348,13 @@ end
 
 function AnatomyHost.getSockets<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
-	query: AnatomyHostSocketQuery?
+	layerId: LayerId?,
+	includeOverrides: boolean?
 ): { [SocketT]: AnatomySocket<SocketT> }
 	local sockets: { [SocketT]: AnatomySocket<SocketT> } = {}
 
-	if query ~= nil and query.layerId ~= nil then
-		local layer = self._layers[query.layerId]
+	if layerId ~= nil then
+		local layer = self._layers[layerId]
 		if layer == nil then
 			return sockets
 		end
@@ -420,7 +363,7 @@ function AnatomyHost.getSockets<SocketT, TagT>(
 	end
 
 	for name in collectSocketNames(self) do
-		local socket = self:_resolveSocket(name, query)
+		local socket = self:_resolveSocket(name, layerId, includeOverrides)
 		if socket == nil then
 			continue
 		end
@@ -434,20 +377,41 @@ end
 function AnatomyHost.getSocket<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
 	name: SocketT,
-	query: AnatomyHostSocketQuery?
+	layerId: LayerId?,
+	includeOverrides: boolean?
 ): AnatomySocket<SocketT>?
 	assertSocketNameAllowed(self, name)
-	return self:_resolveSocket(name, query)
+	return self:_resolveSocket(name, layerId, includeOverrides)
 end
 
 function AnatomyHost.bindSocket<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
 	name: SocketT,
 	callback: SocketChangedCallback<SocketT>,
-	runInitially: boolean?
+	runInitially: boolean?,
+	layerId: LayerId?,
+	includeOverrides: boolean?
 ): () -> ()
 	assert(not self._destroyed, "Cannot use a destroyed AnatomyHost")
 	assertSocketNameAllowed(self, name)
+
+	if layerId ~= nil or includeOverrides == false then
+		local current = self:_resolveSocket(name, layerId, includeOverrides)
+		local entry = {
+			name = name,
+			layerId = layerId,
+			includeOverrides = includeOverrides,
+			callback = callback,
+			current = current,
+		}
+		self._socketQueryCallbacks[entry] = true
+		if runInitially == true then
+			callback(current)
+		end
+		return function()
+			self._socketQueryCallbacks[entry] = nil
+		end
+	end
 
 	local callbacks = self._socketCallbacks[name]
 	if callbacks == nil then
@@ -456,7 +420,7 @@ function AnatomyHost.bindSocket<SocketT, TagT>(
 	end
 
 	if runInitially == true then
-		callback(self:_resolveSocket(name, nil))
+		callback(self:_resolveSocket(name, nil, nil))
 	end
 
 	return CallbackSet.bind(callbacks, callback)
@@ -465,14 +429,14 @@ end
 function AnatomyHost.getByTag<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string,
-	query: AnatomyHostTagQuery?
+	layerId: LayerId?
 ): { AnatomyTaggedElement<TagT> }
-	local resolved = if query == nil then self._resolvedByPrefix[prefix] else nil
+	local resolved = if layerId == nil then self._resolvedByPrefix[prefix] else nil
 	if resolved ~= nil then
 		return tagSetToList(resolved)
 	end
 
-	return collectTaggedElements(self, prefix, query)
+	return collectTaggedElements(self, prefix, layerId)
 end
 
 function AnatomyHost.bindByTag<SocketT, TagT>(
@@ -519,75 +483,38 @@ function AnatomyHost.bindByTag<SocketT, TagT>(
 	end
 end
 
-function AnatomyHost.socket<SocketT, TagT>(
+function AnatomyHost.watchSocket<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
 	name: SocketT,
-	query: AnatomyHostSocketQuery?
-): SocketBinding<SocketT>
+	layerId: LayerId?,
+	includeOverrides: boolean?
+): SocketWatcher<SocketT>
 	assert(not self._destroyed, "Cannot use a destroyed AnatomyHost")
-	assertSocketNameAllowed(self, name)
-
-	local queryCopy = copyQuery(query)
-	local source = {
-		bindSocket = function(
-			_source: SocketBindingSource<SocketT>,
-			socketName: SocketT,
-			callback: SocketChangedCallback<SocketT>,
-			runInitially: boolean?
-		): () -> ()
-			return bindSocketQuery(self, socketName, queryCopy, callback, runInitially)
-		end,
-	}
-
-	local binding = SocketBinding.new(name, source, nil)
-	self._bindings[binding] = true
-
-	return binding
+	local watcher = SocketWatcher.new(self, name, layerId, includeOverrides)
+	self._watchers[watcher] = true
+	return watcher
 end
 
 function AnatomyHost.mount<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
-	config: AnatomyHostMountConfig<SocketT, TagT>
+	from: Attachment?,
+	to: Attachment?,
+	options: SocketMountOptions?
 ): SocketMount
 	assert(not self._destroyed, "Cannot use a destroyed AnatomyHost")
-	local fromEndpoint, fromOwned = self:_normalizeEndpoint(config.from)
-	local toEndpoint: SocketEndpoint? = nil
-	local toOwned: SocketEndpointLifecycle? = nil
-	local mount: SocketMount? = nil
-	local ok, failure = pcall(function(): unknown
-		toEndpoint, toOwned = self:_normalizeEndpoint(config.to)
-		mount = SocketMount.newOwned(
-			fromEndpoint,
-			toEndpoint :: SocketEndpoint,
-			config.options,
-			fromOwned,
-			toOwned
-		)
-		return nil
-	end)
-	if not ok then
-		if fromOwned ~= nil then
-			fromOwned:deconstruct()
-		end
-		if toOwned ~= nil then
-			toOwned:deconstruct()
-		end
-		error(failure, 0)
-	end
-	assert(mount ~= nil, "Mount construction returned no mount")
-
+	local mount = SocketMount.new(from, to, options)
 	self._mounts[mount] = true
-
 	return mount
 end
 
 function AnatomyHost._resolveSocket<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
 	name: SocketT,
-	query: AnatomyHostSocketQuery?
+	layerId: LayerId?,
+	includeOverrides: boolean?
 ): AnatomySocket<SocketT>?
-	if query ~= nil and query.layerId ~= nil then
-		local layer = self._layers[query.layerId]
+	if layerId ~= nil then
+		local layer = self._layers[layerId]
 		if layer == nil then
 			return nil
 		end
@@ -596,7 +523,7 @@ function AnatomyHost._resolveSocket<SocketT, TagT>(
 	end
 
 	local resolved: AnatomySocket<SocketT>? = nil
-	local includeOverrides = query == nil or query.includeOverrides ~= false
+	local useOverrides = includeOverrides ~= false
 
 	for _, layer in self._layerOrder do
 		local socket = layer:getInstance():getSocket(name)
@@ -609,7 +536,7 @@ function AnatomyHost._resolveSocket<SocketT, TagT>(
 			continue
 		end
 
-		if includeOverrides and layer:allowsSocketOverrides() then
+		if useOverrides and layer:allowsSocketOverrides() then
 			resolved = socket
 		end
 	end
@@ -619,7 +546,7 @@ end
 
 function AnatomyHost._refreshSocket<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>, name: SocketT): ()
 	local oldSocket = self._resolvedSockets[name]
-	local newSocket = self:_resolveSocket(name, nil)
+	local newSocket = self:_resolveSocket(name, nil, nil)
 	if oldSocket == newSocket then
 		return
 	end
@@ -638,7 +565,7 @@ function AnatomyHost._refreshAllSockets<SocketT, TagT>(self: AnatomyHostImpl<Soc
 	end
 
 	for entry in self._socketQueryCallbacks do
-		local current = self:_resolveSocket(entry.name, entry.query)
+		local current = self:_resolveSocket(entry.name, entry.layerId, entry.includeOverrides)
 		if entry.current ~= current then
 			entry.current = current
 			entry.callback(current)
@@ -679,44 +606,6 @@ function AnatomyHost._refreshAllWatchedPrefixes<SocketT, TagT>(self: AnatomyHost
 	end
 end
 
-function AnatomyHost._normalizeEndpoint<SocketT, TagT>(
-	self: AnatomyHostImpl<SocketT, TagT>,
-	endpoint: AnatomyHostMountEndpoint<SocketT, TagT>
-): (SocketEndpoint, SocketEndpointLifecycle?)
-	if typeof(endpoint) == "Instance" and endpoint:IsA("Attachment") then
-		return SocketEndpoint.fromAttachment(endpoint), nil
-	end
-
-	if typeof(endpoint) == "table" then
-		local endpointValue = endpoint :: AnatomyHostMountEndpointFields<SocketT, TagT>
-		if endpointValue.getAttachment ~= nil and endpointValue.bindAttachmentChanged ~= nil then
-			return endpoint :: SocketEndpoint, nil
-		end
-
-		if endpointValue.instance ~= nil and endpointValue.socket ~= nil then
-			local socketName = endpointValue.socket :: SocketT
-			assertSocketNameAllowed(self, socketName)
-
-			local socket = endpointValue.instance:getSocket(socketName)
-			if socket == nil then
-				error(`Anatomy instance socket "{socketName}" could not be resolved`, 2)
-			end
-
-			return socket, nil
-		end
-
-		if endpointValue.socket ~= nil then
-			local socketName = endpointValue.socket :: SocketT
-			assertSocketNameAllowed(self, socketName)
-
-			local binding = self:socket(socketName, endpoint :: AnatomyHostSocketQuery)
-			return binding, binding
-		end
-	end
-
-	error("Invalid anatomy socket mount endpoint", 2)
-end
-
 function AnatomyHost.deconstruct<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>): ()
 	if self._destroyed then
 		return
@@ -729,10 +618,10 @@ function AnatomyHost.deconstruct<SocketT, TagT>(self: AnatomyHostImpl<SocketT, T
 	end
 	table.clear(self._mounts)
 
-	for binding in self._bindings do
-		binding:deconstruct()
+	for watcher in self._watchers do
+		watcher:deconstruct()
 	end
-	table.clear(self._bindings)
+	table.clear(self._watchers)
 
 	table.clear(self._socketQueryCallbacks)
 

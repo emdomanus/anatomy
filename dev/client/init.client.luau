@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local Anatomy =
 	require(ReplicatedStorage:WaitForChild("packages"):WaitForChild("anatomy"):WaitForChild("src"))
 local runContractTests = require(script.contractTests)
+local bindMountWatchers = require(script.bindMountWatchers)
 local AnatomyDevTypes = require(game.ReplicatedStorage.anatomyDevTypes.shared.anatomyDev)
 
 local DEV_ROOT_NAME = "AnatomyDev"
@@ -105,11 +106,7 @@ local function attach(
 	to: Attachment,
 	options: Anatomy.SocketMountOptions?
 ): Anatomy.SocketMount
-	return Anatomy.socketMount.new(
-		Anatomy.socketEndpoint.fromAttachment(from),
-		Anatomy.socketEndpoint.fromAttachment(to),
-		options
-	)
+	return Anatomy.socketMount.new(from, to, options)
 end
 
 local player = Players.LocalPlayer
@@ -657,15 +654,13 @@ local function testHostReactiveSocketsAndMounts(): ()
 		priority = 10,
 	})
 
-	local rightGripBinding = host:socket("rightGrip")
-	local weaponGripBinding = host:socket("weaponGrip", {
-		layerId = "weapon",
-	})
+	local rightGripWatcher = host:watchSocket("rightGrip")
+	local weaponGripWatcher = host:watchSocket("weaponGrip", "weapon")
 
-	local attachmentChangeCount = 0
-	local disconnectAttachmentChanged = rightGripBinding:bindAttachmentChanged(
-		function(_attachment: Attachment?)
-			attachmentChangeCount += 1
+	local socketChangeCount = 0
+	local disconnectSocketChanged = rightGripWatcher:bindSocketChanged(
+		function(_socket: Anatomy.AnatomySocket<string>?)
+			socketChangeCount += 1
 		end,
 		true
 	)
@@ -707,26 +702,20 @@ local function testHostReactiveSocketsAndMounts(): ()
 		)
 	end, true)
 
-	local mount = host:mount({
-		from = {
-			socket = "weaponGrip",
-			layerId = "weapon",
-		} :: Anatomy.AnatomyHostSocketAddress<string>,
-		to = {
-			socket = "rightGrip",
-		} :: Anatomy.AnatomyHostSocketAddress<string>,
-		options = {
-			name = "ReactiveWeaponMount",
-			parent = devRoot :: Instance,
-		},
+	local mount = host:mount(nil, nil, {
+		name = "ReactiveWeaponMount",
+		parent = devRoot :: Instance,
 	})
+	local disconnectMount = bindMountWatchers(mount, weaponGripWatcher, rightGripWatcher)
 
 	expect(
-		rightGripBinding:getAttachment() == getSocketAttachment(rigA, "rightGrip"),
+		assert(rightGripWatcher:getSocket(), "Expected right grip socket"):getAttachment()
+			== getSocketAttachment(rigA, "rightGrip"),
 		"Host should expose rig A rightGrip"
 	)
 	expect(
-		weaponGripBinding:getAttachment() == getSocketAttachment(weaponA, "weaponGrip"),
+		assert(weaponGripWatcher:getSocket(), "Expected weapon grip socket"):getAttachment()
+			== getSocketAttachment(weaponA, "weaponGrip"),
 		"Host should expose weapon A grip"
 	)
 	expect(#host:getByTag("body") == 2, "Host should expose two rig body-tagged elements")
@@ -739,9 +728,10 @@ local function testHostReactiveSocketsAndMounts(): ()
 		#host:getByTag("effect.trail") == 2,
 		"Host should expose two nested trail weapon elements"
 	)
-	expect(#host:getByTag("material.metal", {
-		layerId = "weapon",
-	}) == 2, "Layer tag query should expose only weapon metal elements")
+	expect(
+		#host:getByTag("material.metal", "weapon") == 2,
+		"Layer tag query should expose only weapon metal elements"
+	)
 	expect(bodyTagAddCount == 2, "Body tag binding should run initially for torso and head")
 	expect(bodyTagRemoveCount == 0, "Body tag binding should not report removals initially")
 	expect(trailTagAddCount == 2, "Trail tag binding should run initially for handle and blade")
@@ -771,8 +761,9 @@ local function testHostReactiveSocketsAndMounts(): ()
 		priority = 10,
 	})
 	expect(
-		weaponGripBinding:getAttachment() == getSocketAttachment(weaponB, "weaponGrip"),
-		"Weapon binding should follow weapon layer swap"
+		assert(weaponGripWatcher:getSocket(), "Expected weapon grip socket"):getAttachment()
+			== getSocketAttachment(weaponB, "weaponGrip"),
+		"Weapon watcher should follow weapon layer swap"
 	)
 	expect(
 		mount:getFromAttachment() == getSocketAttachment(weaponB, "weaponGrip"),
@@ -811,8 +802,9 @@ local function testHostReactiveSocketsAndMounts(): ()
 		priority = 0,
 	})
 	expect(
-		rightGripBinding:getAttachment() == getSocketAttachment(rigB, "rightGrip"),
-		"Rig binding should follow rig layer swap"
+		assert(rightGripWatcher:getSocket(), "Expected right grip socket"):getAttachment()
+			== getSocketAttachment(rigB, "rightGrip"),
+		"Rig watcher should follow rig layer swap"
 	)
 	expect(
 		mount:getToAttachment() == getSocketAttachment(rigB, "rightGrip"),
@@ -828,16 +820,14 @@ local function testHostReactiveSocketsAndMounts(): ()
 		lastAddedBodyElement ~= nil and lastAddedBodyElement:hasTag("body.upper"),
 		"Added body tag should be nested"
 	)
-	expect(
-		attachmentChangeCount >= 2,
-		"Right grip binding should report initial and swapped attachments"
-	)
+	expect(socketChangeCount >= 2, "Right grip watcher should report initial and swapped sockets")
 
-	disconnectAttachmentChanged()
+	disconnectMount()
+	disconnectSocketChanged()
 	disconnectBodyTags()
 	disconnectTrailTags()
-	rightGripBinding:deconstruct()
-	weaponGripBinding:deconstruct()
+	rightGripWatcher:deconstruct()
+	weaponGripWatcher:deconstruct()
 	host:deconstruct()
 	rigA:deconstruct()
 	rigB:deconstruct()
@@ -878,9 +868,10 @@ local function testOverrideResolution(): ()
 		host:getSocket("rightGrip") == addonOverride:getSocket("rightGrip"),
 		"Higher priority layer should override sockets by default"
 	)
-	expect(host:getSocket("rightGrip", {
-		includeOverrides = false,
-	}) == baseRig:getSocket("rightGrip"), "includeOverrides=false should resolve the base socket")
+	expect(
+		host:getSocket("rightGrip", nil, false) == baseRig:getSocket("rightGrip"),
+		"includeOverrides=false should resolve the base socket"
+	)
 
 	host:deconstruct()
 	baseRig:deconstruct()
@@ -1019,18 +1010,12 @@ local function runStressBenchmark(count: number): ()
 			priority = 10,
 		})
 
-		local mount = host:mount({
-			from = {
-				socket = "weaponGrip",
-				layerId = "weapon",
-			} :: Anatomy.AnatomyHostSocketAddress<string>,
-			to = {
-				socket = "rightGrip",
-			} :: Anatomy.AnatomyHostSocketAddress<string>,
-			options = {
-				parent = benchmarkFolder :: Instance,
-			},
+		local weaponGripWatcher = host:watchSocket("weaponGrip", "weapon")
+		local rightGripWatcher = host:watchSocket("rightGrip")
+		local mount = host:mount(nil, nil, {
+			parent = benchmarkFolder :: Instance,
 		})
+		local disconnectMount = bindMountWatchers(mount, weaponGripWatcher, rightGripWatcher)
 
 		for index = 1, count do
 			local rigIndex = ((index - 1) % #rigInstances) + 1
@@ -1050,6 +1035,7 @@ local function runStressBenchmark(count: number): ()
 		end
 
 		expect(mount:isConnected(), "Benchmark reactive mount should stay connected after swaps")
+		disconnectMount()
 		host:deconstruct()
 	end)
 
@@ -1065,6 +1051,9 @@ local function runStressBenchmark(count: number): ()
 end
 
 local demoState: DemoState = {
+	reactiveMountDisconnect = nil,
+	weaponWatcher = nil,
+	rigWatcher = nil,
 	host = nil,
 	reactiveMount = nil,
 	directMount = nil,
@@ -1125,6 +1114,8 @@ local function setupDemo(): ()
 		id = "InteractiveDemoHost",
 	})
 	demoState.host = host
+	demoState.weaponWatcher = host:watchSocket("weaponGrip", "weapon")
+	demoState.rigWatcher = host:watchSocket("rightGrip")
 	demoState.rigInstances = {
 		makeInstance(
 			"rig",
@@ -1159,19 +1150,16 @@ local function setupDemo(): ()
 	}
 
 	refreshDemoLayers()
-	demoState.reactiveMount = host:mount({
-		from = {
-			socket = "weaponGrip",
-			layerId = "weapon",
-		} :: Anatomy.AnatomyHostSocketAddress<string>,
-		to = {
-			socket = "rightGrip",
-		} :: Anatomy.AnatomyHostSocketAddress<string>,
-		options = {
-			name = "InteractiveReactiveMount",
-			parent = devRoot :: Instance,
-		},
+	local mount = host:mount(nil, nil, {
+		name = "InteractiveReactiveMount",
+		parent = devRoot :: Instance,
 	})
+	demoState.reactiveMount = mount
+	demoState.reactiveMountDisconnect = bindMountWatchers(
+		mount,
+		assert(demoState.weaponWatcher, "Demo weapon watcher is missing"),
+		assert(demoState.rigWatcher, "Demo rig watcher is missing")
+	)
 
 	appendLog("Interactive demo ready. Swap rig or weapon to watch the reactive mount retarget.")
 end
@@ -1205,6 +1193,11 @@ local function attachStaticDemo(): ()
 end
 
 local function rebuildReactiveDemoMount(): ()
+	local disconnectMount = demoState.reactiveMountDisconnect
+	demoState.reactiveMountDisconnect = nil
+	if disconnectMount then
+		disconnectMount()
+	end
 	local reactiveMount = demoState.reactiveMount
 	if reactiveMount ~= nil then
 		reactiveMount:deconstruct()
@@ -1215,19 +1208,16 @@ local function rebuildReactiveDemoMount(): ()
 		return
 	end
 
-	demoState.reactiveMount = host:mount({
-		from = {
-			socket = "weaponGrip",
-			layerId = "weapon",
-		} :: Anatomy.AnatomyHostSocketAddress<string>,
-		to = {
-			socket = "rightGrip",
-		} :: Anatomy.AnatomyHostSocketAddress<string>,
-		options = {
-			name = "InteractiveReactiveMount",
-			parent = devRoot :: Instance,
-		},
+	local mount = host:mount(nil, nil, {
+		name = "InteractiveReactiveMount",
+		parent = devRoot :: Instance,
 	})
+	demoState.reactiveMount = mount
+	demoState.reactiveMountDisconnect = bindMountWatchers(
+		mount,
+		assert(demoState.weaponWatcher, "Demo weapon watcher is missing"),
+		assert(demoState.rigWatcher, "Demo rig watcher is missing")
+	)
 	appendLog("Reactive demo mount rebuilt.")
 end
 

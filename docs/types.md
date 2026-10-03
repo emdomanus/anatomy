@@ -1,16 +1,17 @@
 # Types
 
-Anatomy exposes Luau types from the package entrypoint so consumers can type sockets, tags, hosts, instances, and mount configs without importing implementation modules directly.
+Anatomy exposes Luau types from the package entrypoint so consumers can type sockets, tags, hosts, instances, and mount inputs without importing implementation modules directly.
 
 ```luau
 local Anatomy = require(ReplicatedStorage.packages.anatomy)
 
 type RecognizeOptions<SocketT, TagT> = Anatomy.RecognizeOptions<SocketT, TagT>
 type AnatomyHost<SocketT, TagT> = Anatomy.AnatomyHost<SocketT, TagT>
-type AnatomyHostMountConfig<SocketT, TagT> = Anatomy.AnatomyHostMountConfig<SocketT, TagT>
+type SocketWatcher<SocketT> = Anatomy.SocketWatcher<SocketT>
+type SocketMount = Anatomy.SocketMount
 ```
 
-The exact public surface is re-exported from [`src/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/init.luau) and backed by [`src/anatomy/types/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/init.luau).
+The exact public surface is re-exported from [`src/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/init.luau) and backed by canonical leaf modules under `src/anatomy/types`.
 
 ## Type Index
 
@@ -34,15 +35,12 @@ The exact public surface is re-exported from [`src/init.luau`](https://github.co
 
 ### Components
 
-- [`MountAttachment`](#mountattachment)
-- [`SocketEndpoint`](#socketendpoint)
-- [`SocketAttachmentChangedCallback`](#socketattachmentchangedcallback)
 - [`SocketChangedCallback`](#socketchangedcallback)
 - [`AnatomySocket`](#anatomysocket)
 - [`AnatomyTaggedElement`](#anatomytaggedelement)
 - [`AnatomyTemplate`](#anatomytemplate)
 - [`AnatomyInstance`](#anatomyinstance)
-- [`SocketBinding`](#socketbinding)
+- [`SocketWatcher`](#socketwatcher)
 - [`SocketMount`](#socketmount)
 - [`SocketMountOptions`](#socketmountoptions)
 
@@ -52,12 +50,6 @@ The exact public surface is re-exported from [`src/init.luau`](https://github.co
 - [`AnatomyHostOptions`](#anatomyhostoptions)
 - [`AnatomyHostLayer`](#anatomyhostlayer)
 - [`AnatomyHostLayerOptions`](#anatomyhostlayeroptions)
-- [`AnatomyHostSocketQuery`](#anatomyhostsocketquery)
-- [`AnatomyHostTagQuery`](#anatomyhosttagquery)
-- [`AnatomyHostSocketAddress`](#anatomyhostsocketaddress)
-- [`AnatomyInstanceSocketAddress`](#anatomyinstancesocketaddress)
-- [`AnatomyHostMountEndpoint`](#anatomyhostmountendpoint)
-- [`AnatomyHostMountConfig`](#anatomyhostmountconfig)
 - [`TagChangedCallback`](#tagchangedcallback)
 
 ## AnatomyCategory
@@ -173,35 +165,20 @@ Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com
 
 Alias of [`RecognizeOptions`](#recognizeoptions), used internally once recognition options are normalized.
 
-## MountAttachment
 
-Source: [`src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau)
 
-Alias for the Roblox `Attachment` instance used by socket endpoints and mounts.
-
-## SocketEndpoint
-
-Source: [`src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau)
-
-Common interface for anything that can provide a current mount attachment and notify when it changes.
-
-## SocketAttachmentChangedCallback
-
-Source: [`src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau)
-
-Callback fired when an endpoint's current attachment changes.
 
 ## SocketChangedCallback
 
 Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
-Callback used by host socket watchers and socket bindings when a socket resolves, retargets, or clears.
+Callback used by host subscriptions and socket watchers when a socket resolves, retargets, or clears.
 
 ## AnatomySocket
 
 Source: [`src/anatomy/types/components/anatomySocket/shared/anatomySocket.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomySocket/shared/anatomySocket.luau)
 
-Runtime socket resolved from a [`SocketDescriptor`](#socketdescriptor). It behaves as a [`SocketEndpoint`](#socketendpoint).
+Runtime socket resolved from a [`SocketDescriptor`](#socketdescriptor). `getAttachment()` returns a required `Attachment`. It has no change event; a retired socket rejects attachment access.
 
 ## AnatomyTaggedElement
 
@@ -221,29 +198,45 @@ Source: [`src/anatomy/types/components/anatomyInstance/shared/anatomyInstance.lu
 
 Live clone or wrapped model resolved against an [`AnatomyTemplate`](#anatomytemplate).
 
-## SocketBinding
+## SocketWatcher
 
-Source: [`src/anatomy/types/components/socketBinding/shared/socketBinding.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketBinding/shared/socketBinding.luau)
+Source: [`src/anatomy/types/components/socketWatcher/shared/socketWatcher.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketWatcher/shared/socketWatcher.luau)
 
-Reactive endpoint returned by `host:socket(...)`. It follows the host socket resolution as layers change.
+Caller-owned observer returned by `host:watchSocket(name, layerId?, includeOverrides?)`.
+It has `getName()`, `getSocket(): AnatomySocket?`, `bindSocketChanged(callback, runInitially?)`,
+and idempotent `deconstruct()`. There is no public watcher constructor, attachment getter,
+or attachment-change event. Consumers read the attachment from the selected socket.
 
 ## SocketMount
 
 Source: [`src/anatomy/types/components/socketMount/shared/socketMount.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketMount/shared/socketMount.luau)
 
-Runtime socket-to-socket mount backed by a `RigidConstraint`.
+Owns one `RigidConstraint` with explicit `Attachment?` inputs. Construct with
+`socketMount.new(from, to, options?)` or `host:mount(from, to, options?)`.
+
+- `setAttachments(from, to)` updates both sides. Either side may be nil.
+- `setEnabled(enabled)` sets caller intent, retained across attachment changes.
+- `setParent(parent)` explicitly parents/unparents only the constraint.
+- `getFromAttachment()`, `getToAttachment()`, and `getConstraint()` inspect current state.
+- `isConnected()` reports an enabled constraint with both attachment references, not physics activity.
+- `deconstruct()` destroys the owned constraint, idempotently.
+
+Construction allocates the constraint immediately. A missing side disables it; attachment changes
+reuse it without altering its parent. There is no `refresh`, watcher subscription, polymorphic
+input, or reactive subclass. Caller-owned observation drives any retargeting or visibility behavior.
 
 ## SocketMountOptions
 
 Source: [`src/anatomy/types/components/socketMount/shared/socketMount.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketMount/shared/socketMount.luau)
 
-Options for creating a [`SocketMount`](#socketmount), including the constraint name and parent.
+Options for creating a [`SocketMount`](#socketmount), including the constraint name, requested enabled state, and explicit parent. An omitted
+parent leaves the constraint unparented. The mount consumes these options during construction.
 
 ## AnatomyHost
 
 Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
-Main runtime aggregation API. It accepts anatomy instances as ordered layers, resolves sockets, resolves tag prefixes, creates bindings, and creates mounts.
+Main runtime aggregation API. It accepts anatomy instances as ordered layers, resolves sockets, resolves tag prefixes, creates watchers, and creates mounts.
 
 ```luau
 export type AnatomyHost<SocketT, TagT> = {
@@ -256,18 +249,21 @@ export type AnatomyHost<SocketT, TagT> = {
 	getSocket: (
 		self: AnatomyHost<SocketT, TagT>,
 		name: SocketT,
-		query: AnatomyHostSocketQuery?
+		layerId: LayerId?,
+		includeOverrides: boolean?
 	) -> AnatomySocket<SocketT>?,
 
 	getByTag: (
 		self: AnatomyHost<SocketT, TagT>,
 		prefix: string,
-		query: AnatomyHostTagQuery?
+		layerId: LayerId?
 	) -> { AnatomyTaggedElement<TagT> },
 
 	mount: (
 		self: AnatomyHost<SocketT, TagT>,
-		config: AnatomyHostMountConfig<SocketT, TagT>
+		from: Attachment?,
+		to: Attachment?,
+		options: SocketMountOptions?
 	) -> SocketMount,
 }
 ```
@@ -294,57 +290,11 @@ Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https
 
 Options for pushing an anatomy instance onto a host.
 
-## AnatomyHostSocketQuery
 
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
-Socket lookup filter for layer id and override behavior.
 
-## AnatomyHostTagQuery
 
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
-Tag lookup filter. It currently matches [`AnatomyHostSocketQuery`](#anatomyhostsocketquery).
-
-## AnatomyHostSocketAddress
-
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
-
-Mount endpoint address for resolving a socket through a host.
-
-## AnatomyInstanceSocketAddress
-
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
-
-Mount endpoint address for resolving a socket directly from a specific anatomy instance.
-
-## AnatomyHostMountEndpoint
-
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
-
-Union of all endpoint forms accepted by `host:mount(...)`: host socket address, instance socket address, [`AnatomySocket`](#anatomysocket), [`SocketBinding`](#socketbinding), or raw `Attachment`.
-
-## AnatomyHostMountConfig
-
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
-
-Config object for connecting two mount endpoints.
-
-```luau
-local mountConfig: Anatomy.AnatomyHostMountConfig<string, string> = {
-	from = {
-		socket = "weaponGrip",
-		layerId = "weapon",
-	},
-	to = {
-		socket = "rightGrip",
-		layerId = "rig",
-	},
-	options = {
-		name = "WeaponToRightGrip",
-	},
-}
-```
 
 ## TagChangedCallback
 
@@ -366,10 +316,15 @@ owner receives the internal `Owned` contracts with `deconstruct`. A layer handle
 Reprioritizing a retired handle fails. `AnatomyInstance:getTaggedElements()` returns a
 snapshot of all borrowed tagged elements, including those needed for host ingress validation.
 
-Public ports are `SocketEndpoint`, `SocketSubscription<SocketT>`, and
-`AnatomySocketLookup<SocketT>`. Mounts accept any structural `SocketEndpoint`;
-instance socket addresses only require `AnatomySocketLookup`, independent of template internals.
-The internal host layer command and endpoint lifecycle ports are not package exports.
+`SocketSubscription<SocketT>` is the narrow host capability consumed by watcher construction.
+Its method is `bindSocket(name, callback, runInitially?, layerId?, includeOverrides?)`.
+The internal host layer command port is not a package export. Query/address records, attachment
+adapter factories, endpoint contracts, and instance-address lookup ports have been removed.
+
+Owners remove instances from hosts and clear/destroy attachment mounts before instance teardown.
+Watchers publish `nil` when their address stops resolving. Callers subscribe and explicitly update
+mounts; those subscriptions must be released before mount/host teardown. Watchers survive until
+explicitly released or their host ends. Mounts never own subscriptions or watchers.
 
 Templates snapshot configuration and descriptor tables. Descriptor records, path steps,
 paths, tag sets, and prefix sets are frozen; metadata receives a shallow frozen snapshot

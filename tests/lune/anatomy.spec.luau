@@ -109,20 +109,32 @@ local function count(entries)
 	return result
 end
 
+local bindMountWatchers = loadModule(root.dev.client.bindMountWatchers)
 local host = Anatomy.anatomyHost.new({ socketNameGuard = guardString, tagGuard = guardString })
 for _ = 1, 20 do
-	local mount = host:mount({ from = { socket = "from" }, to = { socket = "to" } })
-	assert(count(host._socketQueryCallbacks) == 2, "Expected two owned subscriptions")
+	local from = host:watchSocket("from", "rig")
+	local to = host:watchSocket("to", "weapon")
+	local mount = host:mount(nil, nil)
+	assert(
+		count(from._socketChangedCallbacks) == 0 and count(to._socketChangedCallbacks) == 0,
+		"Core mount installed subscriptions"
+	)
+	local disconnectMount = bindMountWatchers(mount, from, to)
+	assert(count(host._socketQueryCallbacks) == 2, "Expected two caller-owned subscriptions")
+	assert(count(from._socketChangedCallbacks) == 1, "Owner did not subscribe to source")
+	assert(count(to._socketChangedCallbacks) == 1, "Owner did not subscribe to target")
+	disconnectMount()
+	disconnectMount()
 	mount:deconstruct()
-	assert(count(host._socketQueryCallbacks) == 0, "Mount leaked owned subscriptions")
+	mount:deconstruct()
+	assert(count(host._socketQueryCallbacks) == 2, "Mount destroyed caller-owned watchers")
+	assert(count(from._socketChangedCallbacks) == 0, "Owner leaked source subscription")
+	assert(count(to._socketChangedCallbacks) == 0, "Owner leaked target subscription")
+	from:deconstruct()
+	to:deconstruct()
+	assert(count(host._socketQueryCallbacks) == 0, "Watcher leaked host subscription")
 end
-local external = host:socket("external", { layerId = "layer" })
-local borrowed = host:mount({ from = external, to = external })
-borrowed:deconstruct()
-assert(count(host._socketQueryCallbacks) == 1, "Mount destroyed borrowed endpoint")
-external:deconstruct()
-assert(count(host._socketQueryCallbacks) == 0, "External binding failed to release")
 host:deconstruct()
 print(
-	"PASS: typed-guard runtime cases, prefix queries, immutable descriptors, stale handles, endpoint teardown, and owned/borrowed mount subscriptions (20 cycles)"
+	"PASS: explicit attachment mounts, stable constraint/parenting, owner-driven watcher updates, guards and lifecycle (20 cycles)"
 )

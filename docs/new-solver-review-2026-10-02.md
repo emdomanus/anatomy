@@ -1,5 +1,96 @@
 # New-solver review — 2026-10-02
 
+## Current checkpoint: explicit attachment mounts — 2026-10-03
+
+The user authorized simplifying the remaining mount API. This continues the uncommitted
+socket/watcher redesign below in the same checkout. Plinth and VMMO remain untouched;
+other allocation work stays deferred. No commit or package-pin change was made.
+
+- `Anatomy.socketMount.new(from: Attachment?, to: Attachment?, options?)` and
+  `host:mount(from, to, options?)` create one constraint immediately, even for empty inputs.
+- `setAttachments(from, to)` reuses that constraint. A missing side disables it;
+  restoring both respects the caller's requested enabled state.
+- `setParent(parent: Instance?)` is explicit. Omitted constructor parent means nil,
+  and attachment/enabled updates never infer or restore a parent.
+- Removed polymorphic mount inputs, `SocketMountInput`, `refresh`, watcher subscriptions,
+  automatic parenting, lazy constraint construction, and duplicated attachment caches.
+  Mount construction allocates one Luau object table and one Roblox constraint; it
+  does not allocate a default options table or retain caller options.
+- `isConnected` reports configured enabled/two-attachment state, not physical activity
+  or ancestry. The owner handles visual parenting and mount validity policy.
+- Reactive wiring lives in callers. `dev/client/bindMountWatchers.luau` demonstrates
+  two watcher subscriptions updating a plain mount; it is not a published abstraction.
+  Release these subscriptions before mount/host teardown. Host-created mounts remain
+  host-owned; mounts own only their constraint and borrow the attachments.
+
+VMMO migration must extract `socket:getAttachment()` for concrete mounts and explicitly
+wire watcher changes into `setAttachments` where reactive retargeting is needed. Supply
+the intended constraint parent, manage visual parenting in the renderer, and disconnect
+callbacks before destroying mounts. The earlier watcher/guard migration requirements
+still apply. Consumer source and dependency pins have not been changed.
+
+Verification: baseline full `src` + `dev` new-solver analysis passed. The first changed
+run found one test-only stale property refinement across `setParent`; boolean checks
+were routed through an assertion helper without changing their runtime expectations.
+The second changed run passed with zero diagnostics. Final behavioral tests passed,
+including stable constraint identity, explicit parenting, enabled intent, rejected
+post-destruction mutation, owner-driven visual removal, and subscription cleanup over
+20 cycles. StyLua and Selene passed (zero errors/warnings/parse errors); package/dev
+Rojo builds and the VitePress documentation build passed. Studio physics verification remains pending: the headless
+constraint is a simulated property sink.
+
+## Historical checkpoint: concrete sockets and socket watchers
+
+The preceding solver/conventions checkpoint was accepted and committed locally as
+`96461b7e79bd99600fea5b68ff64f868bd91a32f`. This continuation starts from that clean
+commit in the same Anatomy checkout on `main`; it is a non-YouTrack task. The user
+authorized only the socket/watcher redesign, not the other allocation proposals.
+These continuation changes are uncommitted. Plinth and VMMO remain untouched.
+
+- `AnatomySocket:getAttachment()` returns a required `Attachment`. Concrete sockets
+  have no attachment event or callback storage. Retired sockets reject attachment access.
+- `SocketWatcher` replaces `SocketBinding`. `host:watchSocket(name, layerId?,
+  includeOverrides?)` follows an address, returning a socket or nil through `getSocket`
+  and one `bindSocketChanged` callback set. Its constructor stays internal and receives
+  the host directly as `SocketSubscription`; no per-watcher source adapter is allocated.
+- Socket selectors are positional. Tag selection takes an optional layer id. The
+  query/address records, endpoint interface/adapter/lifecycle port, and now-unused
+  instance-address lookup port have been removed.
+- Both mount constructors take `(from, to, options?)`. Inputs are concrete sockets,
+  watchers, or raw attachments. Mounts borrow all inputs and release only their own
+  subscriptions. Failed construction releases any subscription already installed.
+- Remove instances from all hosts before instance teardown; destroy mounts using
+  concrete sockets before those sockets retire. Host removal produces the watcher's
+  nil/replacement notification. External engine destruction/streaming is not observed.
+- The dev examples and all six existing Studio assertion groups were migrated to this
+  API. Contract coverage exercises typed watcher/socket inputs, different name vocabularies,
+  overrides, priority changes, layer replacement, nil selection, static mounts, watcher
+  teardown, borrowed ownership, and failed mount construction. The headless suite checks
+  subscription cleanup over 20 cycles using actual package modules.
+
+Verification: baseline full `src` + `dev` analyzer passed. The first changed-tree run
+found leftover socket teardown lines referring to the removed callback storage; these
+were removed. Both subsequent full analyzer runs passed with zero diagnostics. The
+initial lint run found four missing dev assertion messages; the final lint run passed
+with zero errors, warnings, or parse errors. Behavioral tests, StyLua, package/dev Rojo
+builds, and VitePress build passed. Studio has not run; headless constraints remain
+simulated property sinks, not a physics verification.
+
+VMMO integration must rename binding type annotations to `SocketWatcher`, change
+`host:socket(name, query)` to `host:watchSocket(name, layerId, includeOverrides)`, and
+replace attachment subscriptions with socket subscriptions that read `socket:getAttachment()`
+when non-nil. Flatten query arguments in rig/view forwarding signatures. Convert mount
+address records to explicit caller-owned watchers or concrete sockets, pass mount inputs
+positionally, and release created watchers with their owning render/controller. Existing
+guard integration requirements from the preceding checkpoint still apply. Package pins
+and consumer code have not been updated here.
+
+Broader performance work is deferred: descriptor copies, recognition scans, instance
+construction records, host refresh copies, tag lookups, weak metatables, and mount
+defaults retain their previous implementation.
+
+## Historical solver/conventions checkpoint
+
 **Solver-clean; automated checks pass. Ready for human review, with Studio verification pending.** Non-YouTrack task.
 
 ## Completed repair checkpoint

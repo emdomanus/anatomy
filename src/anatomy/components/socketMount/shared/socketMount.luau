@@ -1,80 +1,31 @@
 --!strict
 --!optimize 2
 
-local SocketEndpointLifecycleTypes = require(
-	script.Parent.Parent.Parent.Parent.types.ports.components.socketEndpoint.shared.socketEndpointLifecycle
-)
 local SocketMountTypes =
 	require(script.Parent.Parent.Parent.Parent.types.components.socketMount.shared.socketMount)
 
-type SocketEndpointLifecycle = SocketEndpointLifecycleTypes.SocketEndpointLifecycle
-
-type MountAttachment = SocketMountTypes.MountAttachment
-type SocketEndpoint = SocketMountTypes.SocketEndpoint
 type SocketMount = SocketMountTypes.SocketMount
 type SocketMountImpl = SocketMountTypes.SocketMountImpl
 type SocketMountOptions = SocketMountTypes.SocketMountOptions
 
-local function getConstraintParent(
-	options: SocketMountOptions,
-	from: Attachment?,
-	to: Attachment?
-): Instance?
-	if options.parent ~= nil then
-		return options.parent
-	end
-	if to ~= nil and to.Parent ~= nil then
-		return to.Parent
-	end
-	if from ~= nil and from.Parent ~= nil then
-		return from.Parent
-	end
-
-	return nil
-end
-
 local SocketMount = {}
 SocketMount.__index = SocketMount
 
-local function newOwned(
-	fromEndpoint: SocketEndpoint,
-	toEndpoint: SocketEndpoint,
-	options: SocketMountOptions?,
-	fromOwned: SocketEndpointLifecycle?,
-	toOwned: SocketEndpointLifecycle?
-): SocketMount
+local function new(from: Attachment?, to: Attachment?, options: SocketMountOptions?): SocketMount
+	local rigid = Instance.new("RigidConstraint")
+	rigid.Name = if options
+		then options.rigidName or options.name or "AnatomySocketMount"
+		else "AnatomySocketMount"
+	rigid.Attachment0 = from
+	rigid.Attachment1 = to
+	local enabled = options == nil or options.enabled ~= false
+	rigid.Enabled = enabled and from ~= nil and to ~= nil
+	rigid.Parent = if options then options.parent else nil
+
 	local self: SocketMountImpl = setmetatable({}, SocketMount) :: SocketMountImpl
-
-	self._fromOwned = fromOwned
-	self._toOwned = toOwned
-	self._options = options or {}
-	self._name = self._options.name
-	self._fromEndpoint = fromEndpoint
-	self._toEndpoint = toEndpoint
-	self._fromAttachment = nil
-	self._toAttachment = nil
-	self._rigid = nil
-	self._fromAttachmentDisconnect = nil
-	self._toAttachmentDisconnect = nil
-	self._enabled = self._options.enabled ~= false
-	self._destroyed = false
-
-	self._fromAttachmentDisconnect = fromEndpoint:bindAttachmentChanged(
-		function(attachment: Attachment?)
-			self:_setFromAttachment(attachment)
-		end,
-		true
-	)
-
-	self._toAttachmentDisconnect = toEndpoint:bindAttachmentChanged(
-		function(attachment: Attachment?)
-			self:_setToAttachment(attachment)
-		end,
-		true
-	)
-
-	self:refresh()
-
+	self._name = if options then options.name else nil
+	self._rigid = rigid
+	self._enabled = enabled
 	return self
 end
 
@@ -83,11 +34,13 @@ function SocketMount.getName(self: SocketMountImpl): string?
 end
 
 function SocketMount.getFromAttachment(self: SocketMountImpl): Attachment?
-	return self._fromAttachment
+	local rigid = self._rigid
+	return if rigid then rigid.Attachment0 else nil
 end
 
 function SocketMount.getToAttachment(self: SocketMountImpl): Attachment?
-	return self._toAttachment
+	local rigid = self._rigid
+	return if rigid then rigid.Attachment1 else nil
 end
 
 function SocketMount.getConstraint(self: SocketMountImpl): RigidConstraint?
@@ -95,112 +48,36 @@ function SocketMount.getConstraint(self: SocketMountImpl): RigidConstraint?
 end
 
 function SocketMount.isConnected(self: SocketMountImpl): boolean
-	return self._enabled
-		and self._rigid ~= nil
-		and self._fromAttachment ~= nil
-		and self._toAttachment ~= nil
+	local rigid = self._rigid
+	-- Configured connection state, not a claim about physics or ancestry.
+	return rigid ~= nil and rigid.Enabled and rigid.Attachment0 ~= nil and rigid.Attachment1 ~= nil
+end
+
+function SocketMount.setAttachments(self: SocketMountImpl, from: Attachment?, to: Attachment?): ()
+	local rigid = assert(self._rigid, "Cannot use a destroyed SocketMount")
+	rigid.Attachment0 = from
+	rigid.Attachment1 = to
+	rigid.Enabled = self._enabled and from ~= nil and to ~= nil
 end
 
 function SocketMount.setEnabled(self: SocketMountImpl, enabled: boolean): ()
-	assert(not self._destroyed, "Cannot use a destroyed SocketMount")
-	if self._enabled == enabled then
-		return
-	end
-
+	local rigid = assert(self._rigid, "Cannot use a destroyed SocketMount")
 	self._enabled = enabled
-	self:_reconcileConstraint()
+	rigid.Enabled = enabled and rigid.Attachment0 ~= nil and rigid.Attachment1 ~= nil
 end
 
-function SocketMount.refresh(self: SocketMountImpl): ()
-	assert(not self._destroyed, "Cannot use a destroyed SocketMount")
-	self._fromAttachment = (self._fromEndpoint :: SocketEndpoint):getAttachment()
-	self._toAttachment = (self._toEndpoint :: SocketEndpoint):getAttachment()
-	self:_reconcileConstraint()
+function SocketMount.setParent(self: SocketMountImpl, parent: Instance?): ()
+	local rigid = assert(self._rigid, "Cannot use a destroyed SocketMount")
+	rigid.Parent = parent
 end
 
-function SocketMount._setFromAttachment(self: SocketMountImpl, attachment: Attachment?): ()
-	if self._fromAttachment == attachment then
-		return
-	end
-
-	self._fromAttachment = attachment
-	self:_reconcileConstraint()
-end
-
-function SocketMount._setToAttachment(self: SocketMountImpl, attachment: Attachment?): ()
-	if self._toAttachment == attachment then
-		return
-	end
-
-	self._toAttachment = attachment
-	self:_reconcileConstraint()
-end
-
-function SocketMount._reconcileConstraint(self: SocketMountImpl): ()
-	local hasAttachments = self._fromAttachment ~= nil and self._toAttachment ~= nil
-
-	if self._rigid == nil and hasAttachments then
-		local rigid = Instance.new("RigidConstraint")
-		rigid.Name = self._options.rigidName or self._name or "AnatomySocketMount"
-		rigid.Parent = getConstraintParent(self._options, self._fromAttachment, self._toAttachment)
-		self._rigid = rigid
-	end
-
+function SocketMount.deconstruct(self: SocketMountImpl): ()
 	local rigid = self._rigid
 	if rigid == nil then
 		return
 	end
-
-	rigid.Attachment0 = self._fromAttachment
-	rigid.Attachment1 = self._toAttachment
-	rigid.Enabled = self._enabled and hasAttachments
-
-	if rigid.Parent == nil and hasAttachments then
-		rigid.Parent = getConstraintParent(self._options, self._fromAttachment, self._toAttachment)
-	end
-end
-
-function SocketMount.deconstruct(self: SocketMountImpl): ()
-	if self._destroyed then
-		return
-	end
-
-	self._destroyed = true
-
-	if self._fromAttachmentDisconnect ~= nil then
-		self._fromAttachmentDisconnect()
-	end
-	if self._toAttachmentDisconnect ~= nil then
-		self._toAttachmentDisconnect()
-	end
-
-	if self._fromOwned ~= nil then
-		self._fromOwned:deconstruct()
-	end
-	if self._toOwned ~= nil then
-		self._toOwned:deconstruct()
-	end
-	self._fromOwned = nil
-	self._toOwned = nil
-
-	if self._rigid ~= nil then
-		self._rigid:Destroy()
-	end
-
-	self._fromAttachment = nil
-	self._toAttachment = nil
 	self._rigid = nil
-	self._fromEndpoint = nil
-	self._toEndpoint = nil
-	self._fromAttachmentDisconnect = nil
-	self._toAttachmentDisconnect = nil
+	rigid:Destroy()
 end
 
-local function new(
-	fromEndpoint: SocketEndpoint,
-	toEndpoint: SocketEndpoint,
-	options: SocketMountOptions?
-): SocketMount
-	return newOwned(fromEndpoint, toEndpoint, options, nil, nil)
-end
-return { new = new, newOwned = newOwned }
+return { new = new }
