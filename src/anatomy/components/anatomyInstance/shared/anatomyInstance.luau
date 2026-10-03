@@ -141,6 +141,53 @@ function AnatomyInstance.getSocket<SocketT, TagT>(
 	return self._sockets[name]
 end
 
+function AnatomyInstance.forEachSocket<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	callback: (SocketT, AnatomySocket<SocketT>) -> ()
+): ()
+	for name, socket in self._sockets do
+		callback(name, socket)
+	end
+end
+
+function AnatomyInstance.forEachTaggedElement<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	callback: (AnatomyTaggedElement<TagT>) -> ()
+): ()
+	for _, element in self._taggedElements do
+		callback(element)
+	end
+end
+
+function AnatomyInstance.forEachByTag<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	prefix: string,
+	callback: (AnatomyTaggedElement<TagT>) -> ()
+): ()
+	local elements = self._tagPrefixIndex[prefix]
+	if elements then
+		for _, element in elements do
+			callback(element)
+		end
+	end
+end
+
+function AnatomyInstance.getFirstByTag<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	prefix: string
+): AnatomyTaggedElement<TagT>?
+	local elements = self._tagPrefixIndex[prefix]
+	return if elements then elements[1] else nil
+end
+
+function AnatomyInstance.getLastByTag<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	prefix: string
+): AnatomyTaggedElement<TagT>?
+	local elements = self._tagPrefixIndex[prefix]
+	return if elements then elements[#elements] else nil
+end
+
 function AnatomyInstance.getSockets<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>
 ): { [SocketT]: AnatomySocket<SocketT> }

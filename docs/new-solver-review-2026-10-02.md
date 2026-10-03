@@ -1,6 +1,10 @@
 # New-solver review — 2026-10-02
 
-## Current checkpoint: explicit attachment mounts — 2026-10-03
+The socket/watcher and explicit-mount checkpoints below were accepted and committed
+as `3738a5a`. The subsequent performance work and current verification receipt are in
+[the allocation checkpoint](./allocation-review-2026-10-03.md).
+
+## Historical checkpoint: explicit attachment mounts — 2026-10-03
 
 The user authorized simplifying the remaining mount API. This continues the uncommitted
 socket/watcher redesign below in the same checkout. Plinth and VMMO remain untouched;

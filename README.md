@@ -182,6 +182,24 @@ With a layer id, only that layer is considered. Without one, overrides default t
 passing `nil, false` selects the first matching layer. Tag lookup takes `getByTag(prefix, layerId?)`.
 Query/address tables and `socketEndpoint.fromAttachment` are no longer part of the API.
 
+## Collection reads without temporary tables
+
+Existing collection getters still return independent snapshots. Use
+`instance:getFirstByTag(prefix)` or `host:getFirstByTag(prefix, layerId?)` when only one
+match is needed; use the corresponding `getLastByTag` method for the last match. These return an element or nil without allocating a result array.
+The host follows the same selection order as its `getByTag(...)` collection; watched prefix
+sets have unspecified order.
+
+For synchronous read-only traversal, use `instance:forEachSocket(callback)`,
+`instance:forEachTaggedElement(callback)`, `instance:forEachByTag(prefix, callback)`,
+and `element:forEachTag(callback)`. Socket callbacks receive `(name, socket)`; the
+others receive the element or tag. They expose borrowed objects, never private tables.
+Callbacks must not destroy or structurally mutate the instance being traversed.
+Use the existing snapshot getters when iteration must survive such mutation.
+
+Templates now reuse frozen construction data, and hosts use these traversal methods
+internally. See [allocation accounting](docs/allocation-review-2026-10-03.md).
+
 ## Tags
 
 Configure tags with:

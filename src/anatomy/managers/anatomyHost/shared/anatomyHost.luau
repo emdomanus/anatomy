@@ -68,17 +68,21 @@ local function sortHostLayers<SocketT, TagT>(layerOrder: { AnatomyHostLayerOwned
 	)
 end
 
-local function collectSocketNames<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>): { [SocketT]: boolean }
+local function collectSocketNames<SocketT, TagT>(
+	resolvedSockets: { [SocketT]: AnatomySocket<SocketT>? },
+	layerOrder: { AnatomyHostLayerOwned<SocketT, TagT> }
+): { [SocketT]: boolean }
 	local names = {}
 
-	for name in self._resolvedSockets do
+	for name in resolvedSockets do
 		names[name] = true
 	end
 
-	for _, layer in self._layerOrder do
-		for name in layer:getInstance():getSockets() do
-			names[name] = true
-		end
+	local function addName(name: SocketT)
+		names[name] = true
+	end
+	for _, layer in layerOrder do
+		layer:getInstance():forEachSocket(addName)
 	end
 
 	return names
@@ -117,12 +121,15 @@ local function areTagCallbacksEmpty<TagT>(callbacks: {
 end
 
 local function collectTaggedElements<SocketT, TagT>(
-	self: AnatomyHostImpl<SocketT, TagT>,
+	layerOrder: { AnatomyHostLayerOwned<SocketT, TagT> },
+	layers: {
+		[LayerId]: AnatomyHostLayerOwned<SocketT, TagT>,
+	},
 	prefix: string,
 	layerId: LayerId?
 ): { AnatomyTaggedElement<TagT> }
 	if layerId ~= nil then
-		local layer = self._layers[layerId]
+		local layer = layers[layerId]
 		if layer == nil then
 			return {}
 		end
@@ -130,24 +137,27 @@ local function collectTaggedElements<SocketT, TagT>(
 		return layer:getInstance():getByTag(prefix)
 	end
 
-	local elements = {}
-	for _, layer in self._layerOrder do
-		for _, element in layer:getInstance():getByTag(prefix) do
-			table.insert(elements, element)
-		end
+	local elements: { AnatomyTaggedElement<TagT> } = {}
+	local function append(element: AnatomyTaggedElement<TagT>)
+		table.insert(elements, element)
+	end
+	for _, layer in layerOrder do
+		layer:getInstance():forEachByTag(prefix, append)
 	end
 
 	return elements
 end
 
 local function collectTaggedElementSet<SocketT, TagT>(
-	self: AnatomyHostImpl<SocketT, TagT>,
+	layerOrder: { AnatomyHostLayerOwned<SocketT, TagT> },
 	prefix: string
 ): { [AnatomyTaggedElement<TagT>]: true }
-	local set = {}
-
-	for _, element in collectTaggedElements(self, prefix, nil) do
+	local set: { [AnatomyTaggedElement<TagT>]: true } = {}
+	local function add(element: AnatomyTaggedElement<TagT>)
 		set[element] = true
+	end
+	for _, layer in layerOrder do
+		layer:getInstance():forEachByTag(prefix, add)
 	end
 
 	return set
@@ -165,12 +175,16 @@ local function tagSetToList<TagT>(
 	return elements
 end
 
-local function assertSocketNameAllowed<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>, name: SocketT): ()
-	local guard = self._socketNameGuard
+local function assertSocketNameAllowed<SocketT>(
+	guard: AnatomyHostTypes.NameGuard<SocketT>,
+	name: SocketT
+): ()
 	if guard(name) ~= name then
 		error(`Anatomy socket name "{name}" is not allowed by this host`, 3)
 	end
 end
+
+local weakKeys = table.freeze({ __mode = "k" })
 
 local AnatomyHost = {}
 AnatomyHost.__index = AnatomyHost
@@ -189,8 +203,8 @@ local function new<SocketT, TagT>(options: AnatomyHostOptions<SocketT, TagT>): A
 	self._socketQueryCallbacks = {}
 	self._tagPrefixCallbacks = {}
 	self._resolvedByPrefix = {}
-	self._watchers = setmetatable({}, { __mode = "k" })
-	self._mounts = setmetatable({}, { __mode = "k" })
+	self._watchers = setmetatable({}, weakKeys)
+	self._mounts = setmetatable({}, weakKeys)
 	self._nextLayerOrdinal = 1
 	self._destroyed = false
 
@@ -210,15 +224,15 @@ function AnatomyHost.push<SocketT, TagT>(
 
 	local insertOrder = self._nextLayerOrdinal
 
-	for name in instance:getSockets() do
-		assertSocketNameAllowed(self, name)
+	instance:forEachSocket(function(name)
+		assertSocketNameAllowed(self._socketNameGuard, name)
+	end)
+	local function validateTag(tag: TagT)
+		assert(self._tagGuard(tag) == tag, "Tag guards must preserve identity")
 	end
-
-	for _, element in instance:getTaggedElements() do
-		for tag in element:getTags() do
-			assert(self._tagGuard(tag) == tag, "Tag guards must preserve identity")
-		end
-	end
+	instance:forEachTaggedElement(function(element)
+		element:forEachTag(validateTag)
+	end)
 
 	local layer = AnatomyHostLayer.new(
 		self,
@@ -330,14 +344,14 @@ function AnatomyHost.getSocketNames<SocketT, TagT>(
 			return {}
 		end
 
-		for name in layer:getInstance():getSockets() do
+		layer:getInstance():forEachSocket(function(name)
 			names[name] = true
-		end
+		end)
 
 		return makeSortedNameList(names)
 	end
 
-	for name in collectSocketNames(self) do
+	for name in collectSocketNames(self._resolvedSockets, self._layerOrder) do
 		if self:_resolveSocket(name, layerId, includeOverrides) ~= nil then
 			names[name] = true
 		end
@@ -362,7 +376,7 @@ function AnatomyHost.getSockets<SocketT, TagT>(
 		return layer:getInstance():getSockets()
 	end
 
-	for name in collectSocketNames(self) do
+	for name in collectSocketNames(self._resolvedSockets, self._layerOrder) do
 		local socket = self:_resolveSocket(name, layerId, includeOverrides)
 		if socket == nil then
 			continue
@@ -380,7 +394,7 @@ function AnatomyHost.getSocket<SocketT, TagT>(
 	layerId: LayerId?,
 	includeOverrides: boolean?
 ): AnatomySocket<SocketT>?
-	assertSocketNameAllowed(self, name)
+	assertSocketNameAllowed(self._socketNameGuard, name)
 	return self:_resolveSocket(name, layerId, includeOverrides)
 end
 
@@ -393,7 +407,7 @@ function AnatomyHost.bindSocket<SocketT, TagT>(
 	includeOverrides: boolean?
 ): () -> ()
 	assert(not self._destroyed, "Cannot use a destroyed AnatomyHost")
-	assertSocketNameAllowed(self, name)
+	assertSocketNameAllowed(self._socketNameGuard, name)
 
 	if layerId ~= nil or includeOverrides == false then
 		local current = self:_resolveSocket(name, layerId, includeOverrides)
@@ -426,6 +440,58 @@ function AnatomyHost.bindSocket<SocketT, TagT>(
 	return CallbackSet.bind(callbacks, callback)
 end
 
+function AnatomyHost.getFirstByTag<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	prefix: string,
+	layerId: LayerId?
+): AnatomyTaggedElement<TagT>?
+	if layerId ~= nil then
+		local layer = self._layers[layerId]
+		return if layer then layer:getInstance():getFirstByTag(prefix) else nil
+	end
+	local resolved = self._resolvedByPrefix[prefix]
+	if resolved ~= nil then
+		for element in resolved do
+			return element
+		end
+		return nil
+	end
+	for _, layer in self._layerOrder do
+		local element = layer:getInstance():getFirstByTag(prefix)
+		if element ~= nil then
+			return element
+		end
+	end
+	return nil
+end
+
+function AnatomyHost.getLastByTag<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	prefix: string,
+	layerId: LayerId?
+): AnatomyTaggedElement<TagT>?
+	if layerId ~= nil then
+		local layer = self._layers[layerId]
+		return if layer then layer:getInstance():getLastByTag(prefix) else nil
+	end
+	local resolved = self._resolvedByPrefix[prefix]
+	if resolved ~= nil then
+		local last: AnatomyTaggedElement<TagT>? = nil
+		for element in resolved do
+			last = element
+		end
+		return last
+	end
+	for index = #self._layerOrder, 1, -1 do
+		local layer = self._layerOrder[index]
+		local element = layer:getInstance():getLastByTag(prefix)
+		if element ~= nil then
+			return element
+		end
+	end
+	return nil
+end
+
 function AnatomyHost.getByTag<SocketT, TagT>(
 	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string,
@@ -436,7 +502,7 @@ function AnatomyHost.getByTag<SocketT, TagT>(
 		return tagSetToList(resolved)
 	end
 
-	return collectTaggedElements(self, prefix, layerId)
+	return collectTaggedElements(self._layerOrder, self._layers, prefix, layerId)
 end
 
 function AnatomyHost.bindByTag<SocketT, TagT>(
@@ -454,7 +520,7 @@ function AnatomyHost.bindByTag<SocketT, TagT>(
 			removed = {},
 		}
 		self._tagPrefixCallbacks[prefix] = callbacks
-		self._resolvedByPrefix[prefix] = collectTaggedElementSet(self, prefix)
+		self._resolvedByPrefix[prefix] = collectTaggedElementSet(self._layerOrder, prefix)
 	end
 
 	local unbindAdded = CallbackSet.bind(callbacks.added, onAdded)
@@ -560,7 +626,7 @@ function AnatomyHost._refreshSocket<SocketT, TagT>(self: AnatomyHostImpl<SocketT
 end
 
 function AnatomyHost._refreshAllSockets<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>): ()
-	for name in collectSocketNames(self) do
+	for name in collectSocketNames(self._resolvedSockets, self._layerOrder) do
 		self:_refreshSocket(name)
 	end
 
@@ -579,7 +645,7 @@ function AnatomyHost._refreshTagPrefix<SocketT, TagT>(self: AnatomyHostImpl<Sock
 		return
 	end
 
-	local newSet = collectTaggedElementSet(self, prefix)
+	local newSet = collectTaggedElementSet(self._layerOrder, prefix)
 	self._resolvedByPrefix[prefix] = newSet
 
 	local callbacks = self._tagPrefixCallbacks[prefix]

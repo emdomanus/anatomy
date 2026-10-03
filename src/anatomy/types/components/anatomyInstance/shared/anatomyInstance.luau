@@ -30,6 +30,27 @@ export type AnatomyInstance<TemplateT, SocketT, TagT> = {
 	read getTemplate: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> TemplateT,
 	read getMetadata: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> DescriptorMetadata?,
 
+	read forEachSocket: (
+		self: AnatomyInstance<TemplateT, SocketT, TagT>,
+		callback: (SocketT, AnatomySocket<SocketT>) -> ()
+	) -> (),
+	read forEachTaggedElement: (
+		self: AnatomyInstance<TemplateT, SocketT, TagT>,
+		callback: (AnatomyTaggedElement<TagT>) -> ()
+	) -> (),
+	read forEachByTag: (
+		self: AnatomyInstance<TemplateT, SocketT, TagT>,
+		prefix: string,
+		callback: (AnatomyTaggedElement<TagT>) -> ()
+	) -> (),
+	read getFirstByTag: (
+		self: AnatomyInstance<TemplateT, SocketT, TagT>,
+		prefix: string
+	) -> AnatomyTaggedElement<TagT>?,
+	read getLastByTag: (
+		self: AnatomyInstance<TemplateT, SocketT, TagT>,
+		prefix: string
+	) -> AnatomyTaggedElement<TagT>?,
 	read getSockets: (
 		self: AnatomyInstance<TemplateT, SocketT, TagT>
 	) -> { [SocketT]: AnatomySocket<SocketT> },
@@ -83,9 +104,9 @@ export type AnatomyInstanceImpl<TemplateT, SocketT, TagT> = AnatomyInstance<
 }
 
 export type AnatomyInstanceOptions<SocketT, TagT> = {
-	socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> },
-	tagDescriptors: { TagDescriptor<TagT> },
-	instancePolicy: InstancePolicy?,
-	tagPathDelimiter: string,
+	read socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> },
+	read tagDescriptors: { TagDescriptor<TagT> },
+	read instancePolicy: InstancePolicy?,
+	read tagPathDelimiter: string,
 }
 return {}

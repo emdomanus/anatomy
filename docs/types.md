@@ -330,3 +330,31 @@ Templates snapshot configuration and descriptor tables. Descriptor records, path
 paths, tag sets, and prefix sets are frozen; metadata receives a shallow frozen snapshot
 (nested arbitrary metadata values remain caller-owned). The source Roblox Instance remains live.
 Collection-returning getters retain their existing snapshot semantics.
+
+## Allocation-free reads
+
+The collection getters continue to return independent, mutable outer snapshots.
+These additional operations avoid those temporary collections:
+
+| Object | Method | Callback/result |
+| --- | --- | --- |
+| Instance | `forEachSocket(callback)` | Callback receives `(name, socket)` |
+| Instance | `forEachTaggedElement(callback)` | Callback receives each tagged element |
+| Instance | `forEachByTag(prefix, callback)` | Callback receives each prefix match |
+| Tagged element | `forEachTag(callback)` | Callback receives each complete tag |
+| Instance | `getFirstByTag(prefix)` | First match or nil |
+| Host | `getFirstByTag(prefix, layerId?)` | First match or nil |
+| Instance | `getLastByTag(prefix)` | Last match or nil |
+| Host | `getLastByTag(prefix, layerId?)` | Last match or nil |
+
+Traversal is synchronous and borrows object references without exposing backing tables.
+Callbacks must not destroy or structurally mutate the instance being traversed. Use a
+snapshot getter for mutation during iteration. Missing prefixes produce no calls; retired
+tagged elements produce no tags. Single-result selection matches the corresponding
+end of the `getByTag(...)` collection, including the unspecified set order for watched host prefixes.
+No extra source object, adapter, or public port is needed.
+
+Template construction retains one frozen instance-options record shared by all its instances.
+Recognized descriptors are frozen in place; public construction from caller descriptors still
+copies and freezes them. Metadata retains its existing shallow-snapshot behavior.
+See [allocation accounting](./allocation-review-2026-10-03.md).

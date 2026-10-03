@@ -99,6 +99,7 @@ local function testExplicitMount()
 end
 
 local function run()
+	require(script.Parent.allocationContractTests)()
 	testExplicitMount()
 	-- The constructor call has no annotation or assertion: both types must infer.
 	local inferredHost =

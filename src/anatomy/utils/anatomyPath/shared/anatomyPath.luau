@@ -53,12 +53,12 @@ function AnatomyPath.fromRoot(root: Instance, target: Instance): AnatomyPath
 		)
 	end
 
-	local path: AnatomyPath = table.create(#reversedPath) :: AnatomyPath
-	for index = #reversedPath, 1, -1 do
-		table.insert(path, reversedPath[index])
+	for index = 1, math.floor(#reversedPath / 2) do
+		local opposite = #reversedPath - index + 1
+		reversedPath[index], reversedPath[opposite] = reversedPath[opposite], reversedPath[index]
 	end
 
-	return path
+	return reversedPath
 end
 
 function AnatomyPath.resolve(root: Instance, path: AnatomyPath): Instance?

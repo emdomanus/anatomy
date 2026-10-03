@@ -61,6 +61,18 @@ function AnatomyTaggedElement.getTags<TagT>(self: AnatomyTaggedElementImpl<TagT>
 	return table.clone(self._tags)
 end
 
+function AnatomyTaggedElement.forEachTag<TagT>(
+	self: AnatomyTaggedElementImpl<TagT>,
+	callback: (TagT) -> ()
+): ()
+	if self._destroyed then
+		return
+	end
+	for tag in self._tags do
+		callback(tag)
+	end
+end
+
 function AnatomyTaggedElement.hasTag<TagT>(self: AnatomyTaggedElementImpl<TagT>, prefix: string): boolean
 	if self._destroyed then
 		return false

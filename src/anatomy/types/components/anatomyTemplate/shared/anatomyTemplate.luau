@@ -51,6 +51,7 @@ export type AnatomyTemplateImpl<SocketT, TagT> = AnatomyTemplate<SocketT, TagT> 
 	_category: AnatomyCategory?,
 	_source: Instance,
 	_config: RecognizeConfig<SocketT, TagT>,
+	_instanceOptions: AnatomyInstanceTypes.AnatomyInstanceOptions<SocketT, TagT>,
 	_metadata: DescriptorMetadata?,
 
 	_socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> },

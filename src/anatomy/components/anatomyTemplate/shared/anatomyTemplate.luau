@@ -172,87 +172,21 @@ local function hasEntries<K, V>(values: { [K]: V }): boolean
 	return false
 end
 
-local function makeSearchList(root: Instance): { Instance }
-	local list: { Instance } = table.create(#root:GetDescendants() + 1) :: { Instance }
-	table.insert(list, root)
-
-	for _, descendant in root:GetDescendants() do
-		table.insert(list, descendant)
-	end
-
-	return list
-end
-
 local AnatomyTemplate = {}
 AnatomyTemplate.__index = AnatomyTemplate
 
-function AnatomyTemplate.recognize<SocketT, TagT>(
-	root: Instance,
-	config: RecognizeConfig<SocketT, TagT>
-): AnatomyTemplate<SocketT, TagT>
-	local socketAttribute = getAttributeName(config.socketAttribute)
-	local tagsAttribute = getAttributeName(config.tagsAttribute)
-	local tagDelimiter = if config.tagDelimiter ~= nil and config.tagDelimiter ~= ""
-		then config.tagDelimiter
-		else ";"
-	local tagPathDelimiter = if config.tagPathDelimiter ~= nil
-			and config.tagPathDelimiter ~= ""
-		then config.tagPathDelimiter
-		else "."
-
-	local socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> } = {}
-	local tagDescriptors: { TagDescriptor<TagT> } = {}
-
-	for _, instance in makeSearchList(root) do
-		if socketAttribute ~= nil then
-			local socketName = readNamedAttribute(instance, socketAttribute, "socket")
-			if socketName ~= nil then
-				local typedSocketName = config.socketNameGuard(socketName)
-				assert(typedSocketName == socketName, "Socket guards must preserve identity")
-				if socketDescriptors[typedSocketName] ~= nil then
-					error(`Duplicate anatomy socket "{socketName}" in {root:GetFullName()}`, 2)
-				end
-				if not instance:IsA("Attachment") then
-					error(
-						`Anatomy socket "{socketName}" is on {instance.ClassName}; socket attributes must be on Attachment instances`,
-						2
-					)
-				end
-
-				socketDescriptors[typedSocketName] = {
-					name = typedSocketName,
-					path = AnatomyPath.fromRoot(root, instance),
-				}
-			end
-		end
-
-		if tagsAttribute ~= nil then
-			local tags, prefixes = readTagList(
-				instance,
-				tagsAttribute,
-				tagDelimiter,
-				tagPathDelimiter,
-				config.tagGuard,
-				root
-			)
-			if tags ~= nil and prefixes ~= nil and hasEntries(tags) then
-				table.insert(tagDescriptors, {
-					path = AnatomyPath.fromRoot(root, instance),
-					tags = tags,
-					prefixes = prefixes,
-				})
-			end
-		end
+local function freezePath(path: AnatomyPath): AnatomyPath
+	for _, step in path do
+		table.freeze(step)
 	end
-
-	return AnatomyTemplate.new(root, config, socketDescriptors, tagDescriptors)
+	return table.freeze(path)
 end
 
-function AnatomyTemplate.new<SocketT, TagT>(
+local function createTemplate<SocketT, TagT>(
 	source: Instance,
 	config: RecognizeConfig<SocketT, TagT>,
-	socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> }?,
-	tagDescriptors: { TagDescriptor<TagT> }?
+	socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> },
+	tagDescriptors: { TagDescriptor<TagT> }
 ): AnatomyTemplate<SocketT, TagT>
 	local self: AnatomyTemplateImpl<SocketT, TagT> =
 		setmetatable({}, AnatomyTemplate) :: AnatomyTemplateImpl<SocketT, TagT>
@@ -276,8 +210,8 @@ function AnatomyTemplate.new<SocketT, TagT>(
 	})
 	self._config = options
 	self._metadata = options.metadata
-	self._socketDescriptors = snapshotSocketDescriptors(socketDescriptors)
-	self._tagDescriptors = snapshotTagDescriptors(tagDescriptors)
+	self._socketDescriptors = socketDescriptors
+	self._tagDescriptors = tagDescriptors
 	for name, descriptor in self._socketDescriptors do
 		assert(
 			config.socketNameGuard(name) == name and descriptor.name == name,
@@ -290,7 +224,104 @@ function AnatomyTemplate.new<SocketT, TagT>(
 		end
 	end
 
+	self._instanceOptions = table.freeze({
+		socketDescriptors = self._socketDescriptors,
+		tagDescriptors = self._tagDescriptors,
+		instancePolicy = options.instancePolicy,
+		tagPathDelimiter = if options.tagPathDelimiter == nil
+				or options.tagPathDelimiter == ""
+			then "."
+			else options.tagPathDelimiter,
+	})
+
 	return self
+end
+
+function AnatomyTemplate.recognize<SocketT, TagT>(
+	root: Instance,
+	config: RecognizeConfig<SocketT, TagT>
+): AnatomyTemplate<SocketT, TagT>
+	local socketAttribute = getAttributeName(config.socketAttribute)
+	local tagsAttribute = getAttributeName(config.tagsAttribute)
+	local tagDelimiter = if config.tagDelimiter ~= nil and config.tagDelimiter ~= ""
+		then config.tagDelimiter
+		else ";"
+	local tagPathDelimiter = if config.tagPathDelimiter ~= nil
+			and config.tagPathDelimiter ~= ""
+		then config.tagPathDelimiter
+		else "."
+
+	local socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> } = {}
+	local tagDescriptors: { TagDescriptor<TagT> } = {}
+
+	local descendants = root:GetDescendants()
+	-- Visit the root first without allocating a second search array.
+	for index = 1, #descendants + 1 do
+		local instance = if index == 1 then root else descendants[index - 1]
+		if socketAttribute ~= nil then
+			local socketName = readNamedAttribute(instance, socketAttribute, "socket")
+			if socketName ~= nil then
+				local typedSocketName = config.socketNameGuard(socketName)
+				assert(typedSocketName == socketName, "Socket guards must preserve identity")
+				if socketDescriptors[typedSocketName] ~= nil then
+					error(`Duplicate anatomy socket "{socketName}" in {root:GetFullName()}`, 2)
+				end
+				if not instance:IsA("Attachment") then
+					error(
+						`Anatomy socket "{socketName}" is on {instance.ClassName}; socket attributes must be on Attachment instances`,
+						2
+					)
+				end
+
+				socketDescriptors[typedSocketName] = table.freeze({
+					name = typedSocketName,
+					path = freezePath(AnatomyPath.fromRoot(root, instance)),
+				})
+			end
+		end
+
+		if tagsAttribute ~= nil then
+			local tags, prefixes = readTagList(
+				instance,
+				tagsAttribute,
+				tagDelimiter,
+				tagPathDelimiter,
+				config.tagGuard,
+				root
+			)
+			if tags ~= nil and prefixes ~= nil and hasEntries(tags) then
+				table.insert(
+					tagDescriptors,
+					table.freeze({
+						path = freezePath(AnatomyPath.fromRoot(root, instance)),
+						tags = table.freeze(tags),
+						prefixes = table.freeze(prefixes),
+					})
+				)
+			end
+		end
+	end
+
+	return createTemplate(
+		root,
+		config,
+		table.freeze(socketDescriptors),
+		table.freeze(tagDescriptors)
+	)
+end
+
+function AnatomyTemplate.new<SocketT, TagT>(
+	source: Instance,
+	config: RecognizeConfig<SocketT, TagT>,
+	socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> }?,
+	tagDescriptors: { TagDescriptor<TagT> }?
+): AnatomyTemplate<SocketT, TagT>
+	return createTemplate(
+		source,
+		config,
+		snapshotSocketDescriptors(socketDescriptors),
+		snapshotTagDescriptors(tagDescriptors)
+	)
 end
 
 function AnatomyTemplate.getId<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): AnatomyId?
@@ -335,30 +366,14 @@ function AnatomyTemplate.instantiate<SocketT, TagT>(
 	local root = self._source:Clone()
 	root.Parent = parent
 
-	return AnatomyInstance.new(self, root, true, {
-		socketDescriptors = self:getSocketDescriptors(),
-		tagDescriptors = self:getTagDescriptors(),
-		instancePolicy = self._config.instancePolicy,
-		tagPathDelimiter = if self._config.tagPathDelimiter == nil
-				or self._config.tagPathDelimiter == ""
-			then "."
-			else self._config.tagPathDelimiter,
-	})
+	return AnatomyInstance.new(self, root, true, self._instanceOptions)
 end
 
 function AnatomyTemplate.wrap<SocketT, TagT>(
 	self: AnatomyTemplateImpl<SocketT, TagT>,
 	root: Instance
 ): AnatomyInstance<SocketT, TagT>
-	return AnatomyInstance.new(self, root, false, {
-		socketDescriptors = self:getSocketDescriptors(),
-		tagDescriptors = self:getTagDescriptors(),
-		instancePolicy = self._config.instancePolicy,
-		tagPathDelimiter = if self._config.tagPathDelimiter == nil
-				or self._config.tagPathDelimiter == ""
-			then "."
-			else self._config.tagPathDelimiter,
-	})
+	return AnatomyInstance.new(self, root, false, self._instanceOptions)
 end
 
 return AnatomyTemplate

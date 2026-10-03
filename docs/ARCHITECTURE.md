@@ -147,5 +147,20 @@ requested enabled state, and cleanup of externally wired watcher subscriptions.
 The Studio harness retains its six original assertion groups and adds these contract cases.
 Studio physics, UI, and real constraint lifecycle still require explicit Studio verification.
 
-Broader allocation optimization is a separate checkpoint. Collection snapshots, recognition,
-instance construction options, and host refresh allocations retain their existing behavior.
+## Allocation behavior
+
+Recognition performs one descendant scan, reverses each path in place, and freezes its owned
+records without copying them a second time. The public template constructor continues to
+snapshot caller-owned descriptors. Each template retains one frozen construction record;
+`wrap` and `instantiate` reuse it without descriptor-map/array copies.
+
+Instance/tag traversal methods let hosts validate registrations and collect names/tags directly
+into their destination tables. Public snapshot getters remain independent. Refresh still creates
+fresh name/tag sets so nested callbacks do not overwrite shared scratch; there is no pooling.
+The two weak-key registries share one frozen metatable without changing their ownership behavior.
+`getFirstByTag` and `getLastByTag` avoid result arrays while preserving selection at
+the corresponding end of the existing collection.
+
+See [allocation accounting and integration entrypoints](./allocation-review-2026-10-03.md).
+The contract suite also covers root tags, duplicate sibling ordinals, repeated construction,
+public snapshot isolation, nested host refresh, and duplicate layer tag membership.

@@ -111,6 +111,16 @@ export type AnatomyHost<SocketT, TagT> = {
 		includeOverrides: boolean?
 	) -> SocketWatcher<SocketT>,
 
+	read getFirstByTag: (
+		self: AnatomyHost<SocketT, TagT>,
+		prefix: string,
+		layerId: LayerId?
+	) -> AnatomyTaggedElement<TagT>?,
+	read getLastByTag: (
+		self: AnatomyHost<SocketT, TagT>,
+		prefix: string,
+		layerId: LayerId?
+	) -> AnatomyTaggedElement<TagT>?,
 	read getByTag: (
 		self: AnatomyHost<SocketT, TagT>,
 		prefix: string,
