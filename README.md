@@ -14,7 +14,9 @@ classes, replication state, skills, teams, collision capsules, or world policy.
 pesde install
 ```
 
-The dev Rojo project mounts Anatomy directly under `ReplicatedStorage.packages`.
+The dev Rojo project mirrors the Pesde package layout: its entrypoint is
+`ReplicatedStorage.packages.anatomy.src`, beside its `roblox_packages` dependencies.
+Installed consumers continue to require their Pesde-generated Anatomy package link.
 
 ## Concepts
 
@@ -46,7 +48,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Anatomy = require(ReplicatedStorage.packages.anatomy)
 
+local function guardName(value: unknown): string
+    assert(type(value) == "string" and value ~= "", "Expected a non-empty name")
+    return value
+end
+
 local recognizeOptions = {
+    socketNameGuard = guardName,
+    tagGuard = guardName,
 	socketAttribute = "AnatomySocket",
 	tagsAttribute = "AnatomyTags",
 	tagDelimiter = ";",
@@ -66,7 +75,7 @@ local weaponTemplate = Anatomy.anatomyTemplate.recognize(weaponAsset, recognizeO
 local rig = rigTemplate:instantiate(workspace)
 local weapon = weaponTemplate:instantiate(workspace)
 
-local host = Anatomy.anatomyHost.new()
+local host = Anatomy.anatomyHost.new({ socketNameGuard = guardName, tagGuard = guardName })
 host:push(rig, {
 	id = "rig",
 	priority = 0,
@@ -109,11 +118,14 @@ Configure tags with:
 - `tagsAttribute: string?`
 - `tagDelimiter: string?` default `";"`
 - `tagPathDelimiter: string?` default `"."`
-- `tagGuard: ((path: string) -> TagT?)?`
+- `tagGuard: GuardFn<TagT>` (required; `(unknown) -> TagT`)
 
-If `tagGuard` is omitted, authored tag paths are accepted as strings. If it is
-provided, it receives each full authored tag path and returns the typed tag value
-or `nil` to reject the tag.
+Both `socketNameGuard` and `tagGuard` are required on recognition and host options.
+They use the standalone Guard package's `GuardFn<T>`: accept `unknown`, return the
+identical value with a concrete type, and throw on rejection. Boolean predicates
+and nil-returning validators are no longer accepted. Use a string guard for an
+unrestricted string vocabulary. Hosts validate all names/tags before inserting a layer;
+queries still accept ancestor prefixes that are not complete tag names.
 
 Template-level tags are available through `template:getTagDescriptors()`.
 Instance-level and host-level queries use prefix matching. Use semantic tag
@@ -170,6 +182,22 @@ elements that Anatomy can resolve and mount.
 
 ## Development
 
+Install CLI tools with `rokit install` (replacing Aftman). Both editor and CLI
+analysis explicitly enable `LuauSolverV2`. Both host generics now come from typed
+guard inputs; see the
+[review receipt](docs/new-solver-review-2026-10-02.md).
+
+```powershell
+pwsh -NoProfile -File scripts/setup/fetch-roblox-types.ps1
+pwsh -NoProfile -File scripts/verify/run.ps1
+```
+
+Use `-Check analyze`, `stylua`, `selene`, `tests`, `build`, or `docs` for one gate.
+`-Paths` scopes the formatting check only. The default checks all source and dev
+files. Local build
+artifacts belong in ignored `.verification/`. Studio tests below are a separate
+manual gate; a successful Rojo build does not run them.
+
 The dev project includes a client harness under `dev/client`. It creates simple
 block rigs and weapons, runs assertion tests, and exposes a small UI for static
 mounting, reactive host-layer swaps, and a `Stress 300` benchmark.
@@ -181,9 +209,9 @@ being tested.
 Run static/build checks:
 
 ```sh
-selene src dev
-rojo build default.project.json --output anatomy-build.rbxm
-rojo build dev.project.json --output anatomy-dev-build.rbxl
+pwsh -NoProfile -File scripts/verify/run.ps1 -Check selene
+pwsh -NoProfile -File scripts/verify/run.ps1 -Check build
 ```
 
-The package entrypoint is `src/init.luau`, which re-exports `src/anatomy`.
+The package entrypoint is `src/init.luau`, which selects the public constructors and
+types from their canonical domain-qualified owners under `src/anatomy`.

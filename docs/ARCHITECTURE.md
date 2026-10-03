@@ -32,15 +32,15 @@ The crawl records:
   `Attachment` instances, are guarded by `socketNameGuard`, and must be unique in
   one template.
 - `TagDescriptor<TagT>` from `tagsAttribute`; each authored tag path is split by
-  `tagDelimiter`, trimmed, optionally validated by `tagGuard`, and expanded into
+  `tagDelimiter`, trimmed, validated by required `tagGuard`, and expanded into
   query prefixes using `tagPathDelimiter`.
 
-Templates are immutable by convention. `instantiate(parent)` clones the source
+Templates snapshot and freeze their configuration and descriptor data. Arbitrary nested metadata values and the live source Instance remain caller-owned. `instantiate(parent)` clones the source
 model and binds the clone. `wrap(root)` binds an existing model without cloning.
 
 ## Instance
 
-`AnatomyInstance.new(template, root, ownsRoot?)` resolves descriptor paths against
+The private instance constructor receives a public template and explicit construction options, and resolves descriptor paths against
 the concrete root with `Path.resolve`.
 
 It builds and owns:
@@ -110,3 +110,34 @@ Caller
   lookup.
 - Surface APIs were removed in `0.2.0`; authoring that previously used surfaces
   should move to hierarchical tags.
+
+## Contract ownership
+
+Runtime leaves and mirrored object type owners live under explicit `shared` domains.
+The package entrypoint selects exact canonical leaves; category-level forwarding barrels
+have been removed. `types/ports` holds actual independently consumed capabilities.
+Contracts depend on contracts/definitions, never runtime implementations.
+
+The host owns layer ordering and refresh. Layer handles retain `AnatomyHostLayerCommands`
+plus an immutable registration ordinal, not the host implementation. Socket and tagged-element
+objects do not retain recursive parent implementation types. Instances hold child `Owned`
+views and expose borrowed public views.
+
+Mounts deconstruct only bindings they created while normalizing host socket addresses.
+Externally supplied endpoints remain borrowed. Endpoint destruction publishes a terminal nil
+attachment before clearing subscribers. Creating new subscriptions/resources after teardown fails.
+Remove a layer before destroying its borrowed instance if tag-removal notifications are needed;
+the host observes layer membership, not external instance lifetime or descendant streaming.
+
+## Verification
+
+`pwsh -NoProfile -File scripts/verify/run.ps1 -Check tests` runs actual package modules
+in Lune with Roblox datatype support, without writing generated source. Its constraint sink
+is simulated because Lune 0.10.5 cannot clear reflected attachment references to nil.
+It covers guard rejection, inferred-constructor callers, prefix queries, descriptor snapshots,
+stale handles, terminal attachment notification, and mount-owned subscription release.
+The Studio harness retains its six original assertion groups and adds these contract cases.
+Studio physics, UI, and real constraint lifecycle still require explicit Studio verification.
+
+Allocation optimization is a separate checkpoint. This migration preserves collection snapshot
+APIs and the existing binding adapters; ports are structural views with no adapter allocations.

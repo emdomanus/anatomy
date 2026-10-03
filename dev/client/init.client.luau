@@ -1,11 +1,14 @@
 --!strict
+--!optimize 2
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
-local Anatomy = require(ReplicatedStorage:WaitForChild("packages"):WaitForChild("anatomy"))
-
+local Anatomy =
+	require(ReplicatedStorage:WaitForChild("packages"):WaitForChild("anatomy"):WaitForChild("src"))
+local runContractTests = require(script.contractTests)
+local AnatomyDevTypes = require(game.ReplicatedStorage.anatomyDevTypes.shared.anatomyDev)
 
 local DEV_ROOT_NAME = "AnatomyDev"
 local SOCKET_ATTRIBUTE = "AnatomySocket"
@@ -14,24 +17,18 @@ local DEMO_RIG_ORIGIN = CFrame.new(0, 5, -6)
 local DEMO_WEAPON_ORIGIN = CFrame.new(1.6, 5, -6)
 local DEMO_SLOT_SPACING = 4
 
-type DevModelKind = "rig" | "weapon"
-type TestDefinition = {
-	name: string,
-	run: () -> (),
-}
-type DemoState = {
-	host: any?,
-	reactiveMount: any?,
-	directMount: any?,
-	rigInstances: { any },
-	weaponInstances: { any },
-	activeRigIndex: number,
-	activeWeaponIndex: number,
-	mountedRigIndex: number?,
-	mountedWeaponIndex: number?,
-}
+type DevModelKind = AnatomyDevTypes.DevModelKind
+type TestDefinition = AnatomyDevTypes.TestDefinition
+type DemoState = AnatomyDevTypes.DemoState
 
-local recognizeOptions = {
+local function guardName(value: unknown): string
+	assert(type(value) == "string" and value ~= "", "Expected a non-empty anatomy name")
+	return value
+end
+
+local recognizeOptions: Anatomy.RecognizeOptions<string, string> = {
+	socketNameGuard = guardName,
+	tagGuard = guardName,
 	socketAttribute = SOCKET_ATTRIBUTE,
 	tagsAttribute = TAGS_ATTRIBUTE,
 	tagDelimiter = ";",
@@ -48,8 +45,14 @@ local recognizeOptions = {
 }
 
 local function buildRecognizeConfig<TSocketName, TTagName>(
-	options: Anatomy.RecognizeOptions<TSocketName, TTagName>
-): Anatomy.RecognizeConfig<TSocketName, TTagName>
+	options: Anatomy.RecognizeOptions<
+		TSocketName,
+		TTagName
+	>
+): Anatomy.RecognizeConfig<
+	TSocketName,
+	TTagName
+>
 	return {
 		id = options.id,
 		category = options.category,
@@ -66,14 +69,20 @@ end
 
 local function recognizeRig<TSocketName, TTagName>(
 	root: Instance,
-	options: Anatomy.RecognizeOptions<TSocketName, TTagName>
+	options: Anatomy.RecognizeOptions<
+		TSocketName,
+		TTagName
+	>
 ): Anatomy.AnatomyTemplate<TSocketName, TTagName>
 	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig(options))
 end
 
 local function recognizeAddon<TSocketName, TTagName>(
 	root: Instance,
-	options: Anatomy.RecognizeOptions<TSocketName, TTagName>
+	options: Anatomy.RecognizeOptions<
+		TSocketName,
+		TTagName
+	>
 ): Anatomy.AnatomyTemplate<TSocketName, TTagName>
 	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig(options))
 end
@@ -85,14 +94,22 @@ local function wrap<TSocketName, TTagName>(
 	return template:wrap(root)
 end
 
-local function createHost<TSocketName, TTagName>(
-	options: Anatomy.AnatomyHostOptions<TSocketName>?
-): Anatomy.AnatomyHost<TSocketName, TTagName>
-	return Anatomy.anatomyHost.new(options)
+local function createHost(
+	options: Anatomy.AnatomyHostOptions<string, string>?
+): Anatomy.AnatomyHost<string, string>
+	return Anatomy.anatomyHost.new(options or { socketNameGuard = guardName, tagGuard = guardName })
 end
 
-local function attach(from: Attachment, to: Attachment, options: Anatomy.SocketMountOptions?): Anatomy.SocketMount
-	return Anatomy.socketMount.new(Anatomy.socketEndpoint.fromAttachment(from), Anatomy.socketEndpoint.fromAttachment(to), options)
+local function attach(
+	from: Attachment,
+	to: Attachment,
+	options: Anatomy.SocketMountOptions?
+): Anatomy.SocketMount
+	return Anatomy.socketMount.new(
+		Anatomy.socketEndpoint.fromAttachment(from),
+		Anatomy.socketEndpoint.fromAttachment(to),
+		options
+	)
 end
 
 local player = Players.LocalPlayer
@@ -220,7 +237,10 @@ local function makeRigAsset(name: string, color: Color3, origin: CFrame): Model
 	model.Name = name
 
 	local torso = makePart("Torso", Vector3.new(3, 3, 2), color, origin, model, true)
-	torso:SetAttribute(TAGS_ATTRIBUTE, "part.torso;body.core;body.upper.torso;equip.slots.rightGrip;effect.anchor.body")
+	torso:SetAttribute(
+		TAGS_ATTRIBUTE,
+		"part.torso;body.core;body.upper.torso;equip.slots.rightGrip;effect.anchor.body"
+	)
 
 	local head = makePart(
 		"Head",
@@ -232,7 +252,14 @@ local function makeRigAsset(name: string, color: Color3, origin: CFrame): Model
 	)
 	head:SetAttribute(TAGS_ATTRIBUTE, "part.head;body.core;body.upper.head;effect.anchor.head")
 
-	addInternalRigidConstraint("HeadToTorso", torso, Vector3.new(0, 1.5, 0), head, Vector3.new(0, -0.75, 0), model)
+	addInternalRigidConstraint(
+		"HeadToTorso",
+		torso,
+		Vector3.new(0, 1.5, 0),
+		head,
+		Vector3.new(0, -0.75, 0),
+		model
+	)
 
 	addSocket(torso, "rightGrip", Vector3.new(1.75, 0.2, -0.2))
 	addSocket(torso, "leftGrip", Vector3.new(-1.75, 0.2, -0.2))
@@ -250,7 +277,10 @@ local function makeWeaponAsset(name: string, color: Color3, origin: CFrame): Mod
 	model.Name = name
 
 	local handle = makePart("Handle", Vector3.new(0.45, 2.8, 0.45), color, origin, model, false)
-	handle:SetAttribute(TAGS_ATTRIBUTE, "part.handle;material.metal.handle;effect.trail.handle;weapon.grip.primary")
+	handle:SetAttribute(
+		TAGS_ATTRIBUTE,
+		"part.handle;material.metal.handle;effect.trail.handle;weapon.grip.primary"
+	)
 
 	local blade = makePart(
 		"Blade",
@@ -260,9 +290,19 @@ local function makeWeaponAsset(name: string, color: Color3, origin: CFrame): Mod
 		model,
 		false
 	)
-	blade:SetAttribute(TAGS_ATTRIBUTE, "part.blade;material.metal.blade;effect.trail.blade;weapon.edge.primary")
+	blade:SetAttribute(
+		TAGS_ATTRIBUTE,
+		"part.blade;material.metal.blade;effect.trail.blade;weapon.edge.primary"
+	)
 
-	addInternalRigidConstraint("BladeToHandle", handle, Vector3.new(0, 1.2, 0), blade, Vector3.new(0, -1.3, 0), model)
+	addInternalRigidConstraint(
+		"BladeToHandle",
+		handle,
+		Vector3.new(0, 1.2, 0),
+		blade,
+		Vector3.new(0, -1.3, 0),
+		model
+	)
 
 	addSocket(handle, "weaponGrip", Vector3.new(0, -1.2, 0))
 	addSocket(blade, "trailStart", Vector3.new(0, -1.6, 0))
@@ -326,7 +366,10 @@ local function getBasePart(instance: any, partName: string): BasePart
 	expect(#elements == 1, "Expected exactly one tagged anatomy element for part." .. partName)
 
 	local partInstance = elements[1]:getInstance()
-	expect(partInstance ~= nil and partInstance:IsA("BasePart"), "Anatomy part " .. partName .. " should resolve a BasePart")
+	expect(
+		partInstance ~= nil and partInstance:IsA("BasePart"),
+		"Anatomy part " .. partName .. " should resolve a BasePart"
+	)
 
 	return partInstance :: BasePart
 end
@@ -348,7 +391,9 @@ local function pivotRoot(root: Instance, cframe: CFrame): ()
 end
 
 local function makeTemplate(kind: DevModelKind, name: string, color: Color3, origin: CFrame): any
-	local asset = if kind == "rig" then makeRigAsset(name, color, origin) else makeWeaponAsset(name, color, origin)
+	local asset = if kind == "rig"
+		then makeRigAsset(name, color, origin)
+		else makeWeaponAsset(name, color, origin)
 
 	if kind == "rig" then
 		return recognizeRig(asset, recognizeOptions)
@@ -357,7 +402,13 @@ local function makeTemplate(kind: DevModelKind, name: string, color: Color3, ori
 	return recognizeAddon(asset, recognizeOptions)
 end
 
-local function makeInstance(kind: DevModelKind, name: string, color: Color3, origin: CFrame, parent: Instance?): any
+local function makeInstance(
+	kind: DevModelKind,
+	name: string,
+	color: Color3,
+	origin: CFrame,
+	parent: Instance?
+): any
 	local template = makeTemplate(kind, name .. "Template", color, origin)
 	local instance = template:instantiate(parent)
 	pivotRoot(instance:getRoot(), origin)
@@ -413,7 +464,8 @@ local function runBenchmark(name: string, callback: () -> ()): number
 end
 
 local function testRecognitionAndPolicy(): ()
-	local template = makeTemplate("rig", "UnitRigPolicy", Color3.fromRGB(50, 180, 255), CFrame.new(-8, 2, 0))
+	local template =
+		makeTemplate("rig", "UnitRigPolicy", Color3.fromRGB(50, 180, 255), CFrame.new(-8, 2, 0))
 
 	expect(countDictionary(template:getSocketDescriptors()) == 4, "Rig should expose four sockets")
 	expect(#template:getTagDescriptors() == 2, "Rig should expose two tagged elements")
@@ -428,14 +480,26 @@ local function testRecognitionAndPolicy(): ()
 	expect(torsoBasePart.CanQuery == false, "Instance policy should disable CanQuery")
 	expect(torsoBasePart.CanTouch == false, "Instance policy should disable CanTouch")
 	expect(torsoBasePart.CastShadow == false, "Instance policy should disable CastShadow")
-	expect(torsoBasePart.EnableFluidForces == false, "Instance policy should disable EnableFluidForces")
+	expect(
+		torsoBasePart.EnableFluidForces == false,
+		"Instance policy should disable EnableFluidForces"
+	)
 	expect(torsoBasePart.Massless == true, "Instance policy should make parts massless")
-	expect((torsoBasePart :: any).AudioCanCollide == false, "Instance policy should disable AudioCanCollide")
+	expect(
+		(torsoBasePart :: any).AudioCanCollide == false,
+		"Instance policy should disable AudioCanCollide"
+	)
 	expect(torsoBasePart.Anchored == true, "Rig torso should be the anchored physics root")
 
 	local headBasePart = getBasePart(instance, "head")
-	expect(headBasePart.Anchored == false, "Rig head should stay unanchored and constrained to the torso")
-	expect(instance:getRoot():FindFirstChild("HeadToTorso", true) ~= nil, "Rig should contain an internal head constraint")
+	expect(
+		headBasePart.Anchored == false,
+		"Rig head should stay unanchored and constrained to the torso"
+	)
+	expect(
+		instance:getRoot():FindFirstChild("HeadToTorso", true) ~= nil,
+		"Rig should contain an internal head constraint"
+	)
 
 	local bodyElements = instance:getByTag("body")
 	local upperElements = instance:getByTag("body.upper")
@@ -448,10 +512,16 @@ local function testRecognitionAndPolicy(): ()
 	expect(headElement ~= nil, "Nested body tag query should include head")
 	expect(torsoElement:hasTag("body.upper.torso"), "Torso should expose its nested body leaf")
 	expect(headElement:hasTag("body.upper.head"), "Head should expose its nested body leaf")
-	expect(torsoElement:getLeafUnder("body.upper") == "torso", "Torso body.upper leaf should be torso")
+	expect(
+		torsoElement:getLeafUnder("body.upper") == "torso",
+		"Torso body.upper leaf should be torso"
+	)
 	expect(headElement:getLeafUnder("body.upper") == "head", "Head body.upper leaf should be head")
 	expect(torsoElement:hasTag("part.torso"), "Torso should expose its named part tag")
-	expect(torsoElement:getTags()["equip.slots.rightGrip"] == true, "Torso should expose equipment slot tag")
+	expect(
+		torsoElement:getTags()["equip.slots.rightGrip"] == true,
+		"Torso should expose equipment slot tag"
+	)
 
 	instance:deconstruct()
 	template:getSource():Destroy()
@@ -477,18 +547,30 @@ local function testWrapAndInstantiateOwnership(): ()
 
 	local wrapped = wrap(source, template)
 	wrapped:deconstruct()
-	expect(source.Parent == devRoot, "Wrapped anatomy deconstruct should not destroy the wrapped root")
+	expect(
+		source.Parent == devRoot,
+		"Wrapped anatomy deconstruct should not destroy the wrapped root"
+	)
 
 	local ownedInstance = template:instantiate(devRoot)
 	local ownedRoot = ownedInstance:getRoot()
 	ownedInstance:deconstruct()
-	expect(ownedRoot.Parent == nil, "Instantiated anatomy deconstruct should destroy the cloned root")
+	expect(
+		ownedRoot.Parent == nil,
+		"Instantiated anatomy deconstruct should destroy the cloned root"
+	)
 
 	source:Destroy()
 end
 
 local function testStaticAttach(): ()
-	local rig = makeInstance("rig", "StaticRig", Color3.fromRGB(80, 200, 150), CFrame.new(-2, 2, 0), devRoot)
+	local rig = makeInstance(
+		"rig",
+		"StaticRig",
+		Color3.fromRGB(80, 200, 150),
+		CFrame.new(-2, 2, 0),
+		devRoot
+	)
 	local weapon = makeInstance(
 		"weapon",
 		"StaticWeapon",
@@ -503,7 +585,10 @@ local function testStaticAttach(): ()
 	local blade = getBasePart(weapon, "blade")
 	expect(handle.Anchored == false, "Weapon handle should be unanchored before mounting")
 	expect(blade.Anchored == false, "Weapon blade should be unanchored before mounting")
-	expect(weapon:getRoot():FindFirstChild("BladeToHandle", true) ~= nil, "Weapon should contain an internal blade constraint")
+	expect(
+		weapon:getRoot():FindFirstChild("BladeToHandle", true) ~= nil,
+		"Weapon should contain an internal blade constraint"
+	)
 
 	local mount = attach(weaponAttachment, rigAttachment, {
 		name = "StaticAttach",
@@ -529,13 +614,39 @@ end
 
 local function testHostReactiveSocketsAndMounts(): ()
 	local host = createHost({
+		socketNameGuard = guardName,
+		tagGuard = guardName,
 		id = "ReactiveUnitHost",
 	})
 
-	local rigA = makeInstance("rig", "ReactiveRigA", Color3.fromRGB(75, 155, 255), CFrame.new(2, 2, 0), devRoot)
-	local rigB = makeInstance("rig", "ReactiveRigB", Color3.fromRGB(255, 170, 60), CFrame.new(5, 2, 0), devRoot)
-	local weaponA = makeInstance("weapon", "ReactiveWeaponA", Color3.fromRGB(255, 80, 120), CFrame.new(3, 2, 0), devRoot)
-	local weaponB = makeInstance("weapon", "ReactiveWeaponB", Color3.fromRGB(100, 245, 130), CFrame.new(6, 2, 0), devRoot)
+	local rigA = makeInstance(
+		"rig",
+		"ReactiveRigA",
+		Color3.fromRGB(75, 155, 255),
+		CFrame.new(2, 2, 0),
+		devRoot
+	)
+	local rigB = makeInstance(
+		"rig",
+		"ReactiveRigB",
+		Color3.fromRGB(255, 170, 60),
+		CFrame.new(5, 2, 0),
+		devRoot
+	)
+	local weaponA = makeInstance(
+		"weapon",
+		"ReactiveWeaponA",
+		Color3.fromRGB(255, 80, 120),
+		CFrame.new(3, 2, 0),
+		devRoot
+	)
+	local weaponB = makeInstance(
+		"weapon",
+		"ReactiveWeaponB",
+		Color3.fromRGB(100, 245, 130),
+		CFrame.new(6, 2, 0),
+		devRoot
+	)
 
 	host:push(rigA, {
 		id = "rig",
@@ -552,9 +663,12 @@ local function testHostReactiveSocketsAndMounts(): ()
 	})
 
 	local attachmentChangeCount = 0
-	local disconnectAttachmentChanged = rightGripBinding:bindAttachmentChanged(function(_attachment: Attachment?)
-		attachmentChangeCount += 1
-	end, true)
+	local disconnectAttachmentChanged = rightGripBinding:bindAttachmentChanged(
+		function(_attachment: Attachment?)
+			attachmentChangeCount += 1
+		end,
+		true
+	)
 
 	local bodyTagAddCount = 0
 	local bodyTagRemoveCount = 0
@@ -567,7 +681,10 @@ local function testHostReactiveSocketsAndMounts(): ()
 	end, function(element: any)
 		bodyTagRemoveCount += 1
 		lastRemovedBodyElement = element
-		expect(element:hasTag("body.upper"), "Body tag remove should come from the nested body prefix")
+		expect(
+			element:hasTag("body.upper"),
+			"Body tag remove should come from the nested body prefix"
+		)
 	end, true)
 
 	local trailTagAddCount = 0
@@ -577,33 +694,51 @@ local function testHostReactiveSocketsAndMounts(): ()
 	local disconnectTrailTags = host:bindByTag("effect.trail", function(element: any)
 		trailTagAddCount += 1
 		lastAddedTrailElement = element
-		expect(element:hasTag("effect.trail"), "Trail tag add should come from the nested trail prefix")
+		expect(
+			element:hasTag("effect.trail"),
+			"Trail tag add should come from the nested trail prefix"
+		)
 	end, function(element: any)
 		trailTagRemoveCount += 1
 		lastRemovedTrailElement = element
-		expect(element:hasTag("effect.trail"), "Trail tag remove should come from the nested trail prefix")
+		expect(
+			element:hasTag("effect.trail"),
+			"Trail tag remove should come from the nested trail prefix"
+		)
 	end, true)
 
 	local mount = host:mount({
 		from = {
 			socket = "weaponGrip",
 			layerId = "weapon",
-		},
+		} :: Anatomy.AnatomyHostSocketAddress<string>,
 		to = {
 			socket = "rightGrip",
-		},
+		} :: Anatomy.AnatomyHostSocketAddress<string>,
 		options = {
 			name = "ReactiveWeaponMount",
 			parent = devRoot :: Instance,
 		},
 	})
 
-	expect(rightGripBinding:getAttachment() == getSocketAttachment(rigA, "rightGrip"), "Host should expose rig A rightGrip")
-	expect(weaponGripBinding:getAttachment() == getSocketAttachment(weaponA, "weaponGrip"), "Host should expose weapon A grip")
+	expect(
+		rightGripBinding:getAttachment() == getSocketAttachment(rigA, "rightGrip"),
+		"Host should expose rig A rightGrip"
+	)
+	expect(
+		weaponGripBinding:getAttachment() == getSocketAttachment(weaponA, "weaponGrip"),
+		"Host should expose weapon A grip"
+	)
 	expect(#host:getByTag("body") == 2, "Host should expose two rig body-tagged elements")
 	expect(#host:getByTag("body.upper") == 2, "Host should expose two nested body elements")
-	expect(#host:getByTag("material.metal") == 2, "Host should expose two nested metal weapon elements")
-	expect(#host:getByTag("effect.trail") == 2, "Host should expose two nested trail weapon elements")
+	expect(
+		#host:getByTag("material.metal") == 2,
+		"Host should expose two nested metal weapon elements"
+	)
+	expect(
+		#host:getByTag("effect.trail") == 2,
+		"Host should expose two nested trail weapon elements"
+	)
 	expect(#host:getByTag("material.metal", {
 		layerId = "weapon",
 	}) == 2, "Layer tag query should expose only weapon metal elements")
@@ -611,7 +746,10 @@ local function testHostReactiveSocketsAndMounts(): ()
 	expect(bodyTagRemoveCount == 0, "Body tag binding should not report removals initially")
 	expect(trailTagAddCount == 2, "Trail tag binding should run initially for handle and blade")
 	expect(trailTagRemoveCount == 0, "Trail tag binding should not report removals initially")
-	expect(lastAddedBodyElement ~= nil and lastAddedBodyElement:hasTag("body.upper"), "Initial body tag add should be nested")
+	expect(
+		lastAddedBodyElement ~= nil and lastAddedBodyElement:hasTag("body.upper"),
+		"Initial body tag add should be nested"
+	)
 	expect(
 		lastAddedTrailElement ~= nil and lastAddedTrailElement:hasTag("effect.trail"),
 		"Initial trail tag add should be nested"
@@ -619,7 +757,10 @@ local function testHostReactiveSocketsAndMounts(): ()
 	expect(mount:isConnected(), "Reactive host mount should connect initially")
 
 	host:remove("weapon")
-	expect(#host:getByTag("effect.trail") == 0, "Trail tag prefix should clear when weapon layer is removed")
+	expect(
+		#host:getByTag("effect.trail") == 0,
+		"Trail tag prefix should clear when weapon layer is removed"
+	)
 	expect(trailTagRemoveCount == 2, "Trail tag binding should fire for handle and blade removal")
 	expect(
 		lastRemovedTrailElement ~= nil and lastRemovedTrailElement:hasTag("effect.trail"),
@@ -629,10 +770,22 @@ local function testHostReactiveSocketsAndMounts(): ()
 		id = "weapon",
 		priority = 10,
 	})
-	expect(weaponGripBinding:getAttachment() == getSocketAttachment(weaponB, "weaponGrip"), "Weapon binding should follow weapon layer swap")
-	expect(mount:getFromAttachment() == getSocketAttachment(weaponB, "weaponGrip"), "Reactive mount should follow weapon layer swap")
-	expect(#host:getByTag("material.metal") == 2, "Host metal tag prefix should follow weapon layer swap")
-	expect(#host:getByTag("effect.trail") == 2, "Host trail tag prefix should follow weapon layer swap")
+	expect(
+		weaponGripBinding:getAttachment() == getSocketAttachment(weaponB, "weaponGrip"),
+		"Weapon binding should follow weapon layer swap"
+	)
+	expect(
+		mount:getFromAttachment() == getSocketAttachment(weaponB, "weaponGrip"),
+		"Reactive mount should follow weapon layer swap"
+	)
+	expect(
+		#host:getByTag("material.metal") == 2,
+		"Host metal tag prefix should follow weapon layer swap"
+	)
+	expect(
+		#host:getByTag("effect.trail") == 2,
+		"Host trail tag prefix should follow weapon layer swap"
+	)
 	expect(trailTagAddCount == 4, "Trail tag binding should fire when weapon B is pushed")
 	expect(
 		lastAddedTrailElement ~= nil and lastAddedTrailElement:hasTag("effect.trail"),
@@ -640,8 +793,14 @@ local function testHostReactiveSocketsAndMounts(): ()
 	)
 
 	host:remove("rig")
-	expect(#host:getByTag("body") == 0, "Host body tag prefix should clear when rig layer is removed")
-	expect(#host:getByTag("body.upper") == 0, "Host nested body tag prefix should clear when rig layer is removed")
+	expect(
+		#host:getByTag("body") == 0,
+		"Host body tag prefix should clear when rig layer is removed"
+	)
+	expect(
+		#host:getByTag("body.upper") == 0,
+		"Host nested body tag prefix should clear when rig layer is removed"
+	)
 	expect(bodyTagRemoveCount == 2, "Body tag binding should fire for torso and head removal")
 	expect(
 		lastRemovedBodyElement ~= nil and lastRemovedBodyElement:hasTag("body.upper"),
@@ -651,13 +810,28 @@ local function testHostReactiveSocketsAndMounts(): ()
 		id = "rig",
 		priority = 0,
 	})
-	expect(rightGripBinding:getAttachment() == getSocketAttachment(rigB, "rightGrip"), "Rig binding should follow rig layer swap")
-	expect(mount:getToAttachment() == getSocketAttachment(rigB, "rightGrip"), "Reactive mount should follow rig layer swap")
+	expect(
+		rightGripBinding:getAttachment() == getSocketAttachment(rigB, "rightGrip"),
+		"Rig binding should follow rig layer swap"
+	)
+	expect(
+		mount:getToAttachment() == getSocketAttachment(rigB, "rightGrip"),
+		"Reactive mount should follow rig layer swap"
+	)
 	expect(#host:getByTag("body") == 2, "Host body tag prefix should follow rig layer swap")
-	expect(#host:getByTag("body.upper") == 2, "Host nested body tag prefix should follow rig layer swap")
+	expect(
+		#host:getByTag("body.upper") == 2,
+		"Host nested body tag prefix should follow rig layer swap"
+	)
 	expect(bodyTagAddCount == 4, "Body tag binding should fire when rig B is pushed")
-	expect(lastAddedBodyElement ~= nil and lastAddedBodyElement:hasTag("body.upper"), "Added body tag should be nested")
-	expect(attachmentChangeCount >= 2, "Right grip binding should report initial and swapped attachments")
+	expect(
+		lastAddedBodyElement ~= nil and lastAddedBodyElement:hasTag("body.upper"),
+		"Added body tag should be nested"
+	)
+	expect(
+		attachmentChangeCount >= 2,
+		"Right grip binding should report initial and swapped attachments"
+	)
 
 	disconnectAttachmentChanged()
 	disconnectBodyTags()
@@ -672,11 +846,16 @@ local function testHostReactiveSocketsAndMounts(): ()
 end
 
 local function testOverrideResolution(): ()
-	local host = createHost({
-		id = "OverrideHost",
-	})
+	local host =
+		createHost({ socketNameGuard = guardName, tagGuard = guardName, id = "OverrideHost" })
 
-	local baseRig = makeInstance("rig", "OverrideRig", Color3.fromRGB(90, 160, 255), CFrame.new(8, 2, 0), devRoot)
+	local baseRig = makeInstance(
+		"rig",
+		"OverrideRig",
+		Color3.fromRGB(90, 160, 255),
+		CFrame.new(8, 2, 0),
+		devRoot
+	)
 	local addonOverride = makeInstance(
 		"rig",
 		"OverrideAddon",
@@ -695,13 +874,13 @@ local function testOverrideResolution(): ()
 		allowSocketOverrides = true,
 	})
 
-	expect(host:getSocket("rightGrip") == addonOverride:getSocket("rightGrip"), "Higher priority layer should override sockets by default")
 	expect(
-		host:getSocket("rightGrip", {
-			includeOverrides = false,
-		}) == baseRig:getSocket("rightGrip"),
-		"includeOverrides=false should resolve the base socket"
+		host:getSocket("rightGrip") == addonOverride:getSocket("rightGrip"),
+		"Higher priority layer should override sockets by default"
 	)
+	expect(host:getSocket("rightGrip", {
+		includeOverrides = false,
+	}) == baseRig:getSocket("rightGrip"), "includeOverrides=false should resolve the base socket")
 
 	host:deconstruct()
 	baseRig:deconstruct()
@@ -709,6 +888,7 @@ local function testOverrideResolution(): ()
 end
 
 local tests: { TestDefinition } = {
+	{ name = "typed guards, ownership and lifecycle contracts", run = runContractTests },
 	{
 		name = "recognition descriptors + instance policy",
 		run = testRecognitionAndPolicy,
@@ -773,7 +953,12 @@ local function runStressBenchmark(count: number): ()
 	benchmarkFolder.Name = "Benchmark_" .. tostring(count)
 	benchmarkFolder.Parent = devRoot
 
-	local rigTemplate = makeTemplate("rig", "BenchmarkRigTemplate", Color3.fromRGB(90, 160, 255), CFrame.new(0, 50, 0))
+	local rigTemplate = makeTemplate(
+		"rig",
+		"BenchmarkRigTemplate",
+		Color3.fromRGB(90, 160, 255),
+		CFrame.new(0, 50, 0)
+	)
 	local weaponTemplate = makeTemplate(
 		"weapon",
 		"BenchmarkWeaponTemplate",
@@ -784,20 +969,23 @@ local function runStressBenchmark(count: number): ()
 	local rigInstances: { any } = {}
 	local weaponInstances: { any } = {}
 
-	runBenchmark("instantiate " .. tostring(count) .. " rigs + " .. tostring(count) .. " weapons", function()
-		for index = 1, count do
-			local rig = rigTemplate:instantiate(benchmarkFolder)
-			local weapon = weaponTemplate:instantiate(benchmarkFolder)
+	runBenchmark(
+		"instantiate " .. tostring(count) .. " rigs + " .. tostring(count) .. " weapons",
+		function()
+			for index = 1, count do
+				local rig = rigTemplate:instantiate(benchmarkFolder)
+				local weapon = weaponTemplate:instantiate(benchmarkFolder)
 
-			local x = (index % 30) * 1.5
-			local z = math.floor(index / 30) * 1.5
-			pivotRoot(rig:getRoot(), CFrame.new(x, 20, z))
-			pivotRoot(weapon:getRoot(), CFrame.new(x + 0.8, 20, z))
+				local x = (index % 30) * 1.5
+				local z = math.floor(index / 30) * 1.5
+				pivotRoot(rig:getRoot(), CFrame.new(x, 20, z))
+				pivotRoot(weapon:getRoot(), CFrame.new(x + 0.8, 20, z))
 
-			table.insert(rigInstances, rig)
-			table.insert(weaponInstances, weapon)
+				table.insert(rigInstances, rig)
+				table.insert(weaponInstances, weapon)
+			end
 		end
-	end)
+	)
 
 	runBenchmark("create + destroy " .. tostring(count) .. " static mounts", function()
 		local mounts: { any } = table.create(count)
@@ -818,6 +1006,8 @@ local function runStressBenchmark(count: number): ()
 
 	runBenchmark("swap host layers " .. tostring(count) .. " times", function()
 		local host = createHost({
+			socketNameGuard = guardName,
+			tagGuard = guardName,
 			id = "BenchmarkHost",
 		})
 		host:push(rigInstances[1], {
@@ -833,10 +1023,10 @@ local function runStressBenchmark(count: number): ()
 			from = {
 				socket = "weaponGrip",
 				layerId = "weapon",
-			},
+			} :: Anatomy.AnatomyHostSocketAddress<string>,
 			to = {
 				socket = "rightGrip",
-			},
+			} :: Anatomy.AnatomyHostSocketAddress<string>,
 			options = {
 				parent = benchmarkFolder :: Instance,
 			},
@@ -930,16 +1120,42 @@ end
 
 local function setupDemo(): ()
 	local host = createHost({
+		socketNameGuard = guardName,
+		tagGuard = guardName,
 		id = "InteractiveDemoHost",
 	})
 	demoState.host = host
 	demoState.rigInstances = {
-		makeInstance("rig", "DemoRigBlue", Color3.fromRGB(60, 145, 255), getDemoRigCFrame(1), devRoot),
-		makeInstance("rig", "DemoRigGold", Color3.fromRGB(245, 180, 55), getDemoRigCFrame(2), devRoot),
+		makeInstance(
+			"rig",
+			"DemoRigBlue",
+			Color3.fromRGB(60, 145, 255),
+			getDemoRigCFrame(1),
+			devRoot
+		),
+		makeInstance(
+			"rig",
+			"DemoRigGold",
+			Color3.fromRGB(245, 180, 55),
+			getDemoRigCFrame(2),
+			devRoot
+		),
 	}
 	demoState.weaponInstances = {
-		makeInstance("weapon", "DemoWeaponRed", Color3.fromRGB(255, 80, 100), getDemoWeaponCFrame(1), nil),
-		makeInstance("weapon", "DemoWeaponGreen", Color3.fromRGB(70, 230, 120), getDemoWeaponCFrame(2), nil),
+		makeInstance(
+			"weapon",
+			"DemoWeaponRed",
+			Color3.fromRGB(255, 80, 100),
+			getDemoWeaponCFrame(1),
+			nil
+		),
+		makeInstance(
+			"weapon",
+			"DemoWeaponGreen",
+			Color3.fromRGB(70, 230, 120),
+			getDemoWeaponCFrame(2),
+			nil
+		),
 	}
 
 	refreshDemoLayers()
@@ -947,10 +1163,10 @@ local function setupDemo(): ()
 		from = {
 			socket = "weaponGrip",
 			layerId = "weapon",
-		},
+		} :: Anatomy.AnatomyHostSocketAddress<string>,
 		to = {
 			socket = "rightGrip",
-		},
+		} :: Anatomy.AnatomyHostSocketAddress<string>,
 		options = {
 			name = "InteractiveReactiveMount",
 			parent = devRoot :: Instance,
@@ -980,10 +1196,11 @@ local function attachStaticDemo(): ()
 
 	local rig = demoState.rigInstances[demoState.activeRigIndex]
 	local weapon = demoState.weaponInstances[demoState.activeWeaponIndex]
-	demoState.directMount = attach(getSocketAttachment(weapon, "weaponGrip"), getSocketAttachment(rig, "leftGrip"), {
-		name = "InteractiveStaticMount",
-		parent = devRoot :: Instance,
-	})
+	demoState.directMount =
+		attach(getSocketAttachment(weapon, "weaponGrip"), getSocketAttachment(rig, "leftGrip"), {
+			name = "InteractiveStaticMount",
+			parent = devRoot :: Instance,
+		})
 	appendLog("Static demo mount attached weaponGrip to leftGrip.")
 end
 
@@ -1002,10 +1219,10 @@ local function rebuildReactiveDemoMount(): ()
 		from = {
 			socket = "weaponGrip",
 			layerId = "weapon",
-		},
+		} :: Anatomy.AnatomyHostSocketAddress<string>,
 		to = {
 			socket = "rightGrip",
-		},
+		} :: Anatomy.AnatomyHostSocketAddress<string>,
 		options = {
 			name = "InteractiveReactiveMount",
 			parent = devRoot :: Instance,
@@ -1014,10 +1231,15 @@ local function rebuildReactiveDemoMount(): ()
 	appendLog("Reactive demo mount rebuilt.")
 end
 
-local function makeButton(parent: Instance, text: string, layoutOrder: number, callback: () -> ()): TextButton
+local function makeButton(
+	parent: Instance,
+	text: string,
+	layoutOrder: number,
+	callback: () -> ()
+): TextButton
 	local button = Instance.new("TextButton")
 	button.Name = text:gsub("%s+", "")
-	button.Size = UDim2.new(0, 142, 0, 30)
+	button.Size = UDim2.fromOffset(142, 30)
 	button.LayoutOrder = layoutOrder
 	button.BackgroundColor3 = Color3.fromRGB(38, 42, 50)
 	button.BorderSizePixel = 0
@@ -1026,7 +1248,9 @@ local function makeButton(parent: Instance, text: string, layoutOrder: number, c
 	button.TextColor3 = Color3.fromRGB(235, 240, 245)
 	button.TextSize = 13
 	button.Parent = parent
-	button.Activated:Connect(callback)
+	button.Activated:Connect(function(_input: InputObject, _clickCount: number)
+		callback()
+	end)
 
 	return button
 end
@@ -1046,7 +1270,7 @@ local function buildUi(): ()
 	panel.Name = "Panel"
 	panel.AnchorPoint = Vector2.new(0, 1)
 	panel.Position = UDim2.new(0, 16, 1, -16)
-	panel.Size = UDim2.new(0, 620, 0, 310)
+	panel.Size = UDim2.fromOffset(620, 310)
 	panel.BackgroundColor3 = Color3.fromRGB(18, 21, 26)
 	panel.BorderSizePixel = 0
 	panel.Parent = gui

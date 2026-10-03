@@ -1,16 +1,18 @@
 --!strict
 --!optimize 2
---!native
 
-local Types = require(script.Parent.Parent.Parent.Parent.types.components.socketEndpoint)
+local SocketEndpointTypes = require(
+	script.Parent.Parent.Parent.Parent.types.ports.components.socketEndpoint.shared.socketEndpoint
+)
+local StaticAttachmentEndpointTypes = require(
+	script.Parent.Parent.Parent.Parent.types.components.socketEndpoint.shared.socketEndpoint
+)
 
-export type MountAttachment = Types.MountAttachment
-export type SocketAttachmentChangedCallback = Types.SocketAttachmentChangedCallback
-export type SocketEndpoint = Types.SocketEndpoint
+type MountAttachment = SocketEndpointTypes.MountAttachment
+type SocketAttachmentChangedCallback = SocketEndpointTypes.SocketAttachmentChangedCallback
+type SocketEndpoint = SocketEndpointTypes.SocketEndpoint
 
-type StaticAttachmentEndpoint = SocketEndpoint & {
-	_attachment: Attachment?,
-}
+type StaticAttachmentEndpoint = StaticAttachmentEndpointTypes.StaticAttachmentEndpointImpl
 
 local StaticAttachmentEndpoint = {}
 StaticAttachmentEndpoint.__index = StaticAttachmentEndpoint
@@ -36,7 +38,7 @@ local SocketEndpoint = {}
 function SocketEndpoint.fromAttachment(attachment: Attachment?): SocketEndpoint
 	return setmetatable({
 		_attachment = attachment,
-	}, StaticAttachmentEndpoint) :: any
+	}, StaticAttachmentEndpoint) :: StaticAttachmentEndpoint
 end
 
 return SocketEndpoint

@@ -1,50 +1,88 @@
 --!strict
 --!optimize 2
---!native
 
 local AnatomyInstance = require(script.Parent.Parent.Parent.anatomyInstance.shared.anatomyInstance)
-local Path = require(script.Parent.Parent.Parent.Parent.utils.path)
-local AnatomyInstanceTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyInstance)
-local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTemplate)
+local AnatomyPath = require(script.Parent.Parent.Parent.Parent.utils.anatomyPath.shared.anatomyPath)
+local AnatomyInstanceTypes = require(
+	script.Parent.Parent.Parent.Parent.types.components.anatomyInstance.shared.anatomyInstance
+)
+local AnatomyTemplateTypes = require(
+	script.Parent.Parent.Parent.Parent.types.components.anatomyTemplate.shared.anatomyTemplate
+)
 
-export type AnatomyCategory = Types.AnatomyCategory
-export type AnatomyId = Types.AnatomyId
-export type AnatomyTemplate<SocketT, TagT> = Types.AnatomyTemplate<SocketT, TagT>
-export type AnatomyTemplateImpl<SocketT, TagT> = Types.AnatomyTemplateImpl<SocketT, TagT>
-export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
+type AnatomyCategory = AnatomyTemplateTypes.AnatomyCategory
+type AnatomyId = AnatomyTemplateTypes.AnatomyId
+type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
+type AnatomyTemplateImpl<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplateImpl<SocketT, TagT>
+type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
 	AnatomyTemplate<SocketT, TagT>,
 	SocketT,
 	TagT
 >
-export type DescriptorMetadata = Types.DescriptorMetadata
-export type RecognizeConfig<SocketT, TagT> = Types.RecognizeConfig<SocketT, TagT>
-export type SocketDescriptor<SocketT> = Types.SocketDescriptor<SocketT>
-export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
+type DescriptorMetadata = AnatomyTemplateTypes.DescriptorMetadata
+type RecognizeConfig<SocketT, TagT> = AnatomyTemplateTypes.RecognizeConfig<SocketT, TagT>
+type SocketDescriptor<SocketT> = AnatomyTemplateTypes.SocketDescriptor<SocketT>
+type TagDescriptor<TagT> = AnatomyTemplateTypes.TagDescriptor<TagT>
 
-local AnatomyTemplate = {}
-AnatomyTemplate.__index = AnatomyTemplate
+type AnatomyPath = AnatomyTemplateTypes.AnatomyPath
+type InstancePolicy = AnatomyTemplateTypes.InstancePolicy
 
-local function getAttributeName(config: any, key: string): string?
-	local attributeName = (config :: any)[key]
-	if attributeName == nil or attributeName == "" then
-		return nil
+local function snapshotPath(path: AnatomyPath): AnatomyPath
+	local result: AnatomyPath = {}
+	for _, step in path do
+		table.insert(result, table.freeze(table.clone(step)))
 	end
-
-	return attributeName
+	return table.freeze(result)
 end
 
-local function assertNameAllowed(
-	name: string,
-	guard: ((string) -> boolean)?,
-	descriptorKind: string,
-	root: Instance
-): ()
-	if guard ~= nil and not guard(name) then
-		error(`Anatomy {descriptorKind} "{name}" is not allowed in {root:GetFullName()}`, 3)
-	end
+local function snapshotMetadata(metadata: DescriptorMetadata?): DescriptorMetadata?
+	return if metadata == nil then nil else table.freeze(table.clone(metadata))
 end
 
-local function readNamedAttribute(instance: Instance, attributeName: string, descriptorKind: string): string?
+local function snapshotSocketDescriptors<SocketT>(
+	descriptors: { [SocketT]: SocketDescriptor<SocketT> }?
+): { [SocketT]: SocketDescriptor<SocketT> }
+	local result: { [SocketT]: SocketDescriptor<SocketT> } = {}
+	if descriptors ~= nil then
+		for name, descriptor in descriptors do
+			result[name] = table.freeze({
+				name = descriptor.name,
+				path = snapshotPath(descriptor.path),
+				metadata = snapshotMetadata(descriptor.metadata),
+			})
+		end
+	end
+	return table.freeze(result)
+end
+
+local function snapshotTagDescriptors<TagT>(
+	descriptors: { TagDescriptor<TagT> }?
+): { TagDescriptor<TagT> }
+	local result: { TagDescriptor<TagT> } = {}
+	if descriptors ~= nil then
+		for _, descriptor in descriptors do
+			table.insert(
+				result,
+				table.freeze({
+					path = snapshotPath(descriptor.path),
+					tags = table.freeze(table.clone(descriptor.tags)),
+					prefixes = table.freeze(table.clone(descriptor.prefixes)),
+				})
+			)
+		end
+	end
+	return table.freeze(result)
+end
+
+local function getAttributeName(attributeName: string?): string?
+	return if attributeName == "" then nil else attributeName
+end
+
+local function readNamedAttribute(
+	instance: Instance,
+	attributeName: string,
+	descriptorKind: string
+): string?
 	local value = instance:GetAttribute(attributeName)
 	if value == nil then
 		return nil
@@ -63,7 +101,11 @@ local function trim(value: string): string
 	return (string.gsub(value, "^%s*(.-)%s*$", "%1"))
 end
 
-local function addTagPrefixes(prefixes: { [string]: true }, tagPath: string, tagPathDelimiter: string): ()
+local function addTagPrefixes(
+	prefixes: { [string]: true },
+	tagPath: string,
+	tagPathDelimiter: string
+): ()
 	local segments = string.split(tagPath, tagPathDelimiter)
 	local prefix = ""
 
@@ -82,7 +124,7 @@ local function readTagList<TagT>(
 	tagsAttribute: string,
 	tagDelimiter: string,
 	tagPathDelimiter: string,
-	tagGuard: ((path: string) -> TagT?)?,
+	tagGuard: (unknown) -> TagT,
 	root: Instance
 ): ({ [TagT]: true }?, { [string]: true }?)
 	local value = instance:GetAttribute(tagsAttribute)
@@ -90,7 +132,10 @@ local function readTagList<TagT>(
 		return nil, nil
 	end
 	if typeof(value) ~= "string" then
-		error(`Anatomy tag attribute "{tagsAttribute}" on {instance:GetFullName()} must be a string`, 3)
+		error(
+			`Anatomy tag attribute "{tagsAttribute}" on {instance:GetFullName()} must be a string`,
+			3
+		)
 	end
 
 	local rawTags = value :: string
@@ -107,8 +152,8 @@ local function readTagList<TagT>(
 			continue
 		end
 
-		local tag = if tagGuard == nil then (tagPath :: any) :: TagT else tagGuard(tagPath)
-		if tag == nil then
+		local tag = tagGuard(tagPath)
+		if tag ~= tagPath then
 			error(`Anatomy tag "{tagPath}" is not allowed in {root:GetFullName()}`, 3)
 		end
 
@@ -119,7 +164,7 @@ local function readTagList<TagT>(
 	return tags, prefixes
 end
 
-local function hasEntries(values: { [any]: any }): boolean
+local function hasEntries<K, V>(values: { [K]: V }): boolean
 	for _ in values do
 		return true
 	end
@@ -128,7 +173,7 @@ local function hasEntries(values: { [any]: any }): boolean
 end
 
 local function makeSearchList(root: Instance): { Instance }
-	local list = table.create(#root:GetDescendants() + 1)
+	local list: { Instance } = table.create(#root:GetDescendants() + 1) :: { Instance }
 	table.insert(list, root)
 
 	for _, descendant in root:GetDescendants() do
@@ -138,14 +183,22 @@ local function makeSearchList(root: Instance): { Instance }
 	return list
 end
 
+local AnatomyTemplate = {}
+AnatomyTemplate.__index = AnatomyTemplate
+
 function AnatomyTemplate.recognize<SocketT, TagT>(
 	root: Instance,
 	config: RecognizeConfig<SocketT, TagT>
 ): AnatomyTemplate<SocketT, TagT>
-	local socketAttribute = getAttributeName(config, "socketAttribute")
-	local tagsAttribute = getAttributeName(config, "tagsAttribute")
-	local tagDelimiter = if config.tagDelimiter ~= nil and config.tagDelimiter ~= "" then config.tagDelimiter else ";"
-	local tagPathDelimiter = if config.tagPathDelimiter ~= nil and config.tagPathDelimiter ~= "" then config.tagPathDelimiter else "."
+	local socketAttribute = getAttributeName(config.socketAttribute)
+	local tagsAttribute = getAttributeName(config.tagsAttribute)
+	local tagDelimiter = if config.tagDelimiter ~= nil and config.tagDelimiter ~= ""
+		then config.tagDelimiter
+		else ";"
+	local tagPathDelimiter = if config.tagPathDelimiter ~= nil
+			and config.tagPathDelimiter ~= ""
+		then config.tagPathDelimiter
+		else "."
 
 	local socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> } = {}
 	local tagDescriptors: { TagDescriptor<TagT> } = {}
@@ -154,8 +207,8 @@ function AnatomyTemplate.recognize<SocketT, TagT>(
 		if socketAttribute ~= nil then
 			local socketName = readNamedAttribute(instance, socketAttribute, "socket")
 			if socketName ~= nil then
-				assertNameAllowed(socketName, config.socketNameGuard, "socket", root)
-				local typedSocketName = (socketName :: any) :: SocketT
+				local typedSocketName = config.socketNameGuard(socketName)
+				assert(typedSocketName == socketName, "Socket guards must preserve identity")
 				if socketDescriptors[typedSocketName] ~= nil then
 					error(`Duplicate anatomy socket "{socketName}" in {root:GetFullName()}`, 2)
 				end
@@ -168,17 +221,23 @@ function AnatomyTemplate.recognize<SocketT, TagT>(
 
 				socketDescriptors[typedSocketName] = {
 					name = typedSocketName,
-					path = Path.fromRoot(root, instance),
+					path = AnatomyPath.fromRoot(root, instance),
 				}
 			end
 		end
 
 		if tagsAttribute ~= nil then
-			local tags, prefixes =
-				readTagList(instance, tagsAttribute, tagDelimiter, tagPathDelimiter, config.tagGuard, root)
+			local tags, prefixes = readTagList(
+				instance,
+				tagsAttribute,
+				tagDelimiter,
+				tagPathDelimiter,
+				config.tagGuard,
+				root
+			)
 			if tags ~= nil and prefixes ~= nil and hasEntries(tags) then
 				table.insert(tagDescriptors, {
-					path = Path.fromRoot(root, instance),
+					path = AnatomyPath.fromRoot(root, instance),
 					tags = tags,
 					prefixes = prefixes,
 				})
@@ -195,15 +254,41 @@ function AnatomyTemplate.new<SocketT, TagT>(
 	socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> }?,
 	tagDescriptors: { TagDescriptor<TagT> }?
 ): AnatomyTemplate<SocketT, TagT>
-	local self: AnatomyTemplateImpl<SocketT, TagT> = setmetatable({}, AnatomyTemplate) :: any
+	local self: AnatomyTemplateImpl<SocketT, TagT> =
+		setmetatable({}, AnatomyTemplate) :: AnatomyTemplateImpl<SocketT, TagT>
 
 	self._id = config.id
 	self._category = config.category
 	self._source = source
-	self._config = config
-	self._metadata = config.metadata
-	self._socketDescriptors = socketDescriptors or {}
-	self._tagDescriptors = tagDescriptors or {}
+	local options: RecognizeConfig<SocketT, TagT> = table.freeze({
+		id = config.id,
+		category = config.category,
+		socketAttribute = config.socketAttribute,
+		tagsAttribute = config.tagsAttribute,
+		tagDelimiter = config.tagDelimiter,
+		tagPathDelimiter = config.tagPathDelimiter,
+		socketNameGuard = config.socketNameGuard,
+		tagGuard = config.tagGuard,
+		metadata = snapshotMetadata(config.metadata),
+		instancePolicy = if config.instancePolicy
+			then table.freeze(table.clone(config.instancePolicy))
+			else nil,
+	})
+	self._config = options
+	self._metadata = options.metadata
+	self._socketDescriptors = snapshotSocketDescriptors(socketDescriptors)
+	self._tagDescriptors = snapshotTagDescriptors(tagDescriptors)
+	for name, descriptor in self._socketDescriptors do
+		assert(
+			config.socketNameGuard(name) == name and descriptor.name == name,
+			"Invalid socket descriptor name"
+		)
+	end
+	for _, descriptor in self._tagDescriptors do
+		for tag in descriptor.tags do
+			assert(config.tagGuard(tag) == tag, "Tag guards must preserve identity")
+		end
+	end
 
 	return self
 end
@@ -212,9 +297,7 @@ function AnatomyTemplate.getId<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT,
 	return self._id
 end
 
-function AnatomyTemplate.getCategory<SocketT, TagT>(
-	self: AnatomyTemplateImpl<SocketT, TagT>
-): AnatomyCategory?
+function AnatomyTemplate.getCategory<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): AnatomyCategory?
 	return self._category
 end
 
@@ -222,9 +305,7 @@ function AnatomyTemplate.getSource<SocketT, TagT>(self: AnatomyTemplateImpl<Sock
 	return self._source
 end
 
-function AnatomyTemplate.getMetadata<SocketT, TagT>(
-	self: AnatomyTemplateImpl<SocketT, TagT>
-): DescriptorMetadata?
+function AnatomyTemplate.getMetadata<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): DescriptorMetadata?
 	return self._metadata
 end
 
@@ -254,14 +335,30 @@ function AnatomyTemplate.instantiate<SocketT, TagT>(
 	local root = self._source:Clone()
 	root.Parent = parent
 
-	return AnatomyInstance.new(self, root, true)
+	return AnatomyInstance.new(self, root, true, {
+		socketDescriptors = self:getSocketDescriptors(),
+		tagDescriptors = self:getTagDescriptors(),
+		instancePolicy = self._config.instancePolicy,
+		tagPathDelimiter = if self._config.tagPathDelimiter == nil
+				or self._config.tagPathDelimiter == ""
+			then "."
+			else self._config.tagPathDelimiter,
+	})
 end
 
 function AnatomyTemplate.wrap<SocketT, TagT>(
 	self: AnatomyTemplateImpl<SocketT, TagT>,
 	root: Instance
 ): AnatomyInstance<SocketT, TagT>
-	return AnatomyInstance.new(self, root, false)
+	return AnatomyInstance.new(self, root, false, {
+		socketDescriptors = self:getSocketDescriptors(),
+		tagDescriptors = self:getTagDescriptors(),
+		instancePolicy = self._config.instancePolicy,
+		tagPathDelimiter = if self._config.tagPathDelimiter == nil
+				or self._config.tagPathDelimiter == ""
+			then "."
+			else self._config.tagPathDelimiter,
+	})
 end
 
 return AnatomyTemplate

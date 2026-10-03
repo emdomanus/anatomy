@@ -1,55 +1,57 @@
 --!strict
 --!optimize 2
---!native
 
-local CallbackSet = require(script.Parent.Parent.Parent.Parent.utils.callbackSet)
-local DefTypes = require(script.Parent.Parent.Parent.Parent.types.def)
-local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatomySocket)
+local CallbackSet = require(script.Parent.Parent.Parent.Parent.utils.callbackSet.shared.callbackSet)
+local AnatomyTypes = require(script.Parent.Parent.Parent.Parent.types.def.anatomy.shared.anatomy)
+local AnatomySocketTypes =
+	require(script.Parent.Parent.Parent.Parent.types.components.anatomySocket.shared.anatomySocket)
+local SocketEndpointTypes = require(
+	script.Parent.Parent.Parent.Parent.types.ports.components.socketEndpoint.shared.socketEndpoint
+)
 
-export type AnatomyPath = Types.AnatomyPath
-export type AnatomySocket<SocketT> = Types.AnatomySocket<SocketT>
-export type AnatomySocketImpl<OwnerT, SocketT> = Types.AnatomySocketImpl<OwnerT, SocketT>
-export type DescriptorMetadata = Types.DescriptorMetadata
-export type MountAttachment = Types.MountAttachment
-export type SocketAttachmentChangedCallback = Types.SocketAttachmentChangedCallback
-export type SocketDescriptor<SocketT> = DefTypes.SocketDescriptor<SocketT>
+type AnatomyPath = AnatomyTypes.AnatomyPath
+type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
+type AnatomySocketOwned<SocketT> = AnatomySocketTypes.AnatomySocketOwned<SocketT>
+type AnatomySocketImpl<SocketT> = AnatomySocketTypes.AnatomySocketImpl<SocketT>
+type DescriptorMetadata = AnatomyTypes.DescriptorMetadata
+type MountAttachment = SocketEndpointTypes.MountAttachment
+type SocketAttachmentChangedCallback = SocketEndpointTypes.SocketAttachmentChangedCallback
+type SocketDescriptor<SocketT> = AnatomyTypes.SocketDescriptor<SocketT>
 
 local AnatomySocket = {}
 AnatomySocket.__index = AnatomySocket
 
-function AnatomySocket.new<OwnerT, SocketT>(
-	owner: OwnerT,
+function AnatomySocket.new<SocketT>(
 	name: SocketT,
 	path: AnatomyPath,
 	attachment: Attachment?,
 	metadata: DescriptorMetadata?
-): AnatomySocket<SocketT>
-	local self: AnatomySocketImpl<OwnerT, SocketT> = setmetatable({}, AnatomySocket) :: any
+): AnatomySocketOwned<SocketT>
+	local self: AnatomySocketImpl<SocketT> =
+		setmetatable({}, AnatomySocket) :: AnatomySocketImpl<SocketT>
 
-	self._owner = owner
 	self._name = name
 	self._path = path
 	self._attachment = attachment
 	self._metadata = metadata
-	self._attachmentChangedCallbacks = CallbackSet.new()
+	self._attachmentChangedCallbacks = {}
 	self._destroyed = false
 
 	return self
 end
 
-function AnatomySocket.fromDescriptor<OwnerT, SocketT>(
-	owner: OwnerT,
+function AnatomySocket.fromDescriptor<SocketT>(
 	descriptor: SocketDescriptor<SocketT>,
 	attachment: Attachment?
-): AnatomySocket<SocketT>
-	return AnatomySocket.new(owner, descriptor.name, descriptor.path, attachment, descriptor.metadata)
+): AnatomySocketOwned<SocketT>
+	return AnatomySocket.new(descriptor.name, descriptor.path, attachment, descriptor.metadata)
 end
 
-function AnatomySocket.getName<OwnerT, SocketT>(self: AnatomySocketImpl<OwnerT, SocketT>): SocketT
+function AnatomySocket.getName<SocketT>(self: AnatomySocketImpl<SocketT>): SocketT
 	return self._name
 end
 
-function AnatomySocket.getAttachment<OwnerT, SocketT>(self: AnatomySocketImpl<OwnerT, SocketT>): Attachment?
+function AnatomySocket.getAttachment<SocketT>(self: AnatomySocketImpl<SocketT>): Attachment?
 	if self._destroyed then
 		return nil
 	end
@@ -57,19 +59,20 @@ function AnatomySocket.getAttachment<OwnerT, SocketT>(self: AnatomySocketImpl<Ow
 	return self._attachment
 end
 
-function AnatomySocket.getPath<OwnerT, SocketT>(self: AnatomySocketImpl<OwnerT, SocketT>): AnatomyPath
+function AnatomySocket.getPath<SocketT>(self: AnatomySocketImpl<SocketT>): AnatomyPath
 	return self._path
 end
 
-function AnatomySocket.getMetadata<OwnerT, SocketT>(self: AnatomySocketImpl<OwnerT, SocketT>): DescriptorMetadata?
+function AnatomySocket.getMetadata<SocketT>(self: AnatomySocketImpl<SocketT>): DescriptorMetadata?
 	return self._metadata
 end
 
-function AnatomySocket.bindAttachmentChanged<OwnerT, SocketT>(
-	self: AnatomySocketImpl<OwnerT, SocketT>,
+function AnatomySocket.bindAttachmentChanged<SocketT>(
+	self: AnatomySocketImpl<SocketT>,
 	callback: SocketAttachmentChangedCallback,
 	runInitially: boolean?
 ): () -> ()
+	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomySocket")
 	if runInitially == true then
 		callback(self:getAttachment())
 	end
@@ -77,29 +80,15 @@ function AnatomySocket.bindAttachmentChanged<OwnerT, SocketT>(
 	return CallbackSet.bind(self._attachmentChangedCallbacks, callback)
 end
 
--- Reserved for a future live-socket mode where resolved attachments can retarget
--- inside one AnatomyInstance.
-function AnatomySocket._setAttachment<OwnerT, SocketT>(
-	self: AnatomySocketImpl<OwnerT, SocketT>,
-	attachment: Attachment?
-): ()
-	if self._attachment == attachment then
-		return
-	end
-
-	self._attachment = attachment
-	CallbackSet.fire(self._attachmentChangedCallbacks, attachment)
-end
-
-function AnatomySocket.deconstruct<OwnerT, SocketT>(self: AnatomySocketImpl<OwnerT, SocketT>): ()
+function AnatomySocket.deconstruct<SocketT>(self: AnatomySocketImpl<SocketT>): ()
 	if self._destroyed then
 		return
 	end
 
 	self._destroyed = true
-	table.clear(self._attachmentChangedCallbacks)
 	self._attachment = nil
-	self._owner = nil
+	CallbackSet.fire(self._attachmentChangedCallbacks, nil)
+	table.clear(self._attachmentChangedCallbacks)
 end
 
 return AnatomySocket

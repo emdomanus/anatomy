@@ -1,49 +1,51 @@
 --!strict
 --!optimize 2
---!native
 
 local AnatomySocket = require(script.Parent.Parent.Parent.anatomySocket.shared.anatomySocket)
-local AnatomyTaggedElement = require(script.Parent.Parent.Parent.anatomyTaggedElement.shared.anatomyTaggedElement)
-local Path = require(script.Parent.Parent.Parent.Parent.utils.path)
-local AnatomySocketTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomySocket)
-local AnatomyTaggedElementTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTaggedElement)
-local AnatomyTemplateTypes = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTemplate)
-local DefTypes = require(script.Parent.Parent.Parent.Parent.types.def)
-local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatomyInstance)
+local AnatomyTaggedElement =
+	require(script.Parent.Parent.Parent.anatomyTaggedElement.shared.anatomyTaggedElement)
+local AnatomyPath = require(script.Parent.Parent.Parent.Parent.utils.anatomyPath.shared.anatomyPath)
+local AnatomySocketTypes =
+	require(script.Parent.Parent.Parent.Parent.types.components.anatomySocket.shared.anatomySocket)
+local AnatomyTaggedElementTypes = require(
+	script.Parent.Parent.Parent.Parent.types.components.anatomyTaggedElement.shared.anatomyTaggedElement
+)
+local AnatomyTemplateTypes = require(
+	script.Parent.Parent.Parent.Parent.types.components.anatomyTemplate.shared.anatomyTemplate
+)
+local AnatomyTypes = require(script.Parent.Parent.Parent.Parent.types.def.anatomy.shared.anatomy)
+local AnatomyInstanceTypes = require(
+	script.Parent.Parent.Parent.Parent.types.components.anatomyInstance.shared.anatomyInstance
+)
 
-export type AnatomyCategory = Types.AnatomyCategory
-export type AnatomyId = Types.AnatomyId
-export type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
-export type AnatomyTemplateImpl<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplateImpl<SocketT, TagT>
-export type AnatomyInstance<SocketT, TagT> = Types.AnatomyInstance<
+type AnatomyTaggedElementOwned<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElementOwned<TagT>
+type AnatomyInstanceOptions<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstanceOptions<
+	SocketT,
+	TagT
+>
+type AnatomySocketOwned<SocketT> = AnatomySocketTypes.AnatomySocketOwned<SocketT>
+
+type AnatomyCategory = AnatomyInstanceTypes.AnatomyCategory
+type AnatomyId = AnatomyInstanceTypes.AnatomyId
+type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
+type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
 	AnatomyTemplate<SocketT, TagT>,
 	SocketT,
 	TagT
 >
-export type AnatomyInstanceImpl<SocketT, TagT> = Types.AnatomyInstanceImpl<
-	AnatomyTemplateImpl<SocketT, TagT>,
+type AnatomyInstanceImpl<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstanceImpl<
+	AnatomyTemplate<SocketT, TagT>,
 	SocketT,
 	TagT
 >
-export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
-export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
-export type DescriptorMetadata = Types.DescriptorMetadata
-export type InstancePolicy = Types.InstancePolicy
-export type SocketDescriptor<SocketT> = Types.SocketDescriptor<SocketT>
-export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
-export type AnatomyPath = DefTypes.AnatomyPath
-export type RecognizeConfig<SocketT, TagT> = DefTypes.RecognizeConfig<SocketT, TagT>
-
-local AnatomyInstance = {}
-AnatomyInstance.__index = AnatomyInstance
-
-local function getTagPathDelimiter<SocketT, TagT>(config: RecognizeConfig<SocketT, TagT>): string
-	if config.tagPathDelimiter == nil or config.tagPathDelimiter == "" then
-		return "."
-	end
-
-	return config.tagPathDelimiter
-end
+type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
+type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
+type DescriptorMetadata = AnatomyInstanceTypes.DescriptorMetadata
+type InstancePolicy = AnatomyInstanceTypes.InstancePolicy
+type SocketDescriptor<SocketT> = AnatomyInstanceTypes.SocketDescriptor<SocketT>
+type TagDescriptor<TagT> = AnatomyInstanceTypes.TagDescriptor<TagT>
+type AnatomyPath = AnatomyTypes.AnatomyPath
+type RecognizeConfig<SocketT, TagT> = AnatomyTypes.RecognizeConfig<SocketT, TagT>
 
 local function forRootAndDescendants(root: Instance, callback: (Instance) -> ()): ()
 	callback(root)
@@ -52,9 +54,9 @@ local function forRootAndDescendants(root: Instance, callback: (Instance) -> ())
 	end
 end
 
-local function addTaggedElementToIndex<SocketT, TagT>(
-	tagPrefixIndex: { [string]: { AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<AnatomyInstanceImpl<SocketT, TagT>, TagT> } },
-	element: AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<AnatomyInstanceImpl<SocketT, TagT>, TagT>,
+local function addTaggedElementToIndex<TagT>(
+	tagPrefixIndex: { [string]: { AnatomyTaggedElementOwned<TagT> } },
+	element: AnatomyTaggedElementOwned<TagT>,
 	prefixes: { [string]: true }
 ): ()
 	for prefix in prefixes do
@@ -68,12 +70,17 @@ local function addTaggedElementToIndex<SocketT, TagT>(
 	end
 end
 
+local AnatomyInstance = {}
+AnatomyInstance.__index = AnatomyInstance
+
 function AnatomyInstance.new<SocketT, TagT>(
-	template: AnatomyTemplateImpl<SocketT, TagT>,
+	template: AnatomyTemplate<SocketT, TagT>,
 	root: Instance,
-	ownsRoot: boolean?
+	ownsRoot: boolean?,
+	options: AnatomyInstanceOptions<SocketT, TagT>
 ): AnatomyInstance<SocketT, TagT>
-	local self: AnatomyInstanceImpl<SocketT, TagT> = setmetatable({}, AnatomyInstance) :: any
+	local self: AnatomyInstanceImpl<SocketT, TagT> =
+		setmetatable({}, AnatomyInstance) :: AnatomyInstanceImpl<SocketT, TagT>
 
 	self._template = template
 	self._root = root
@@ -81,37 +88,35 @@ function AnatomyInstance.new<SocketT, TagT>(
 	self._category = template:getCategory()
 	self._metadata = template:getMetadata()
 	self._ownsRoot = ownsRoot == true
+	self._tagPathDelimiter = options.tagPathDelimiter
 
 	self._sockets = {}
 	self._taggedElements = {}
 	self._tagPrefixIndex = {}
 	self._destroyed = false
 
-	for name, descriptor in template:getSocketDescriptors() do
+	for name, descriptor in options.socketDescriptors do
 		self._sockets[name] = self:_buildSocket(descriptor)
 	end
 
-	for _, descriptor in template:getTagDescriptors() do
+	for _, descriptor in options.tagDescriptors do
 		local element = self:_buildTaggedElement(descriptor)
 		table.insert(self._taggedElements, element)
 		addTaggedElementToIndex(self._tagPrefixIndex, element, descriptor.prefixes)
 	end
 
-	local config = template._config
-	if config and config.instancePolicy then
-		self:applyInstancePolicy(config.instancePolicy)
+	if options.instancePolicy then
+		self:applyInstancePolicy(options.instancePolicy)
 	end
 
-	return self :: any
+	return self
 end
 
 function AnatomyInstance.getId<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): AnatomyId?
 	return self._id
 end
 
-function AnatomyInstance.getCategory<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>
-): AnatomyCategory?
+function AnatomyInstance.getCategory<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): AnatomyCategory?
 	return self._category
 end
 
@@ -119,13 +124,13 @@ function AnatomyInstance.getRoot<SocketT, TagT>(self: AnatomyInstanceImpl<Socket
 	return self._root
 end
 
-function AnatomyInstance.getTemplate<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): AnatomyTemplate<SocketT, TagT>
+function AnatomyInstance.getTemplate<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>
+): AnatomyTemplate<SocketT, TagT>
 	return self._template
 end
 
-function AnatomyInstance.getMetadata<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>
-): DescriptorMetadata?
+function AnatomyInstance.getMetadata<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): DescriptorMetadata?
 	return self._metadata
 end
 
@@ -139,7 +144,18 @@ end
 function AnatomyInstance.getSockets<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>
 ): { [SocketT]: AnatomySocket<SocketT> }
-	return table.clone(self._sockets) :: any
+	-- The independent snapshot exposes borrowed children, not their owner's teardown authority.
+	return table.clone(self._sockets) :: { [SocketT]: AnatomySocket<SocketT> }
+end
+
+function AnatomyInstance.getTaggedElements<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>
+): { AnatomyTaggedElement<TagT> }
+	local elements: { AnatomyTaggedElement<TagT> } = {}
+	for _, element in self._taggedElements do
+		table.insert(elements, element)
+	end
+	return elements
 end
 
 function AnatomyInstance.getByTag<SocketT, TagT>(
@@ -151,13 +167,14 @@ function AnatomyInstance.getByTag<SocketT, TagT>(
 		return {}
 	end
 
-	return table.clone(elements) :: any
+	local result: { AnatomyTaggedElement<TagT> } = {}
+	for _, element in elements do
+		table.insert(result, element)
+	end
+	return result
 end
 
-function AnatomyInstance.setParent<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>,
-	parent: Instance?
-): ()
+function AnatomyInstance.setParent<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>, parent: Instance?): ()
 	self._root.Parent = parent
 end
 
@@ -202,16 +219,19 @@ function AnatomyInstance._resolvePath<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>,
 	path: AnatomyPath
 ): Instance?
-	return Path.resolve(self._root, path)
+	return AnatomyPath.resolve(self._root, path)
 end
 
 function AnatomyInstance._buildSocket<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>,
 	descriptor: SocketDescriptor<SocketT>
-): AnatomySocketTypes.AnatomySocketImpl<AnatomyInstanceImpl<SocketT, TagT>, SocketT>
+): AnatomySocketOwned<SocketT>
 	local target = self:_resolvePath(descriptor.path)
 	if target == nil then
-		error(`Anatomy socket "{descriptor.name}" path did not resolve under {self._root:GetFullName()}`, 2)
+		error(
+			`Anatomy socket "{descriptor.name}" path did not resolve under {self._root:GetFullName()}`,
+			2
+		)
 	end
 	if not target:IsA("Attachment") then
 		error(
@@ -220,19 +240,19 @@ function AnatomyInstance._buildSocket<SocketT, TagT>(
 		)
 	end
 
-	return AnatomySocket.fromDescriptor(self, descriptor, target :: Attachment) :: any
+	return AnatomySocket.fromDescriptor(descriptor, target :: Attachment)
 end
 
 function AnatomyInstance._buildTaggedElement<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>,
 	descriptor: TagDescriptor<TagT>
-): AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<AnatomyInstanceImpl<SocketT, TagT>, TagT>
+): AnatomyTaggedElementOwned<TagT>
 	local instance = self:_resolvePath(descriptor.path)
 	if instance == nil then
 		error(`Anatomy tag path did not resolve under {self._root:GetFullName()}`, 2)
 	end
 
-	return AnatomyTaggedElement.fromDescriptor(self, descriptor, instance, getTagPathDelimiter(self._template._config)) :: any
+	return AnatomyTaggedElement.fromDescriptor(descriptor, instance, self._tagPathDelimiter)
 end
 
 function AnatomyInstance.deconstruct<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): ()
@@ -255,9 +275,6 @@ function AnatomyInstance.deconstruct<SocketT, TagT>(self: AnatomyInstanceImpl<So
 	if self._ownsRoot then
 		self._root:Destroy()
 	end
-
-	self._template = nil :: any
-	self._root = nil :: any
 end
 
 return AnatomyInstance

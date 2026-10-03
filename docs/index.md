@@ -21,7 +21,7 @@ Anatomy does not own gameplay state, replication, skills, teams, collision capsu
 The public package entrypoint is `src/init.luau`. It re-exports the package modules and public Luau types from `src/anatomy/types`.
 
 - [Public entrypoint](https://github.com/emdomanus/anatomy/blob/main/src/init.luau)
-- [Type barrel](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/init.luau)
+- [Canonical contracts](https://github.com/emdomanus/anatomy/tree/main/src/anatomy/types)
 - [Architecture notes](/ARCHITECTURE)
 
 ## Minimal Flow
@@ -29,13 +29,20 @@ The public package entrypoint is `src/init.luau`. It re-exports the package modu
 ```luau
 local Anatomy = require(ReplicatedStorage.packages.anatomy)
 
+local function guardName(value: unknown): string
+    assert(type(value) == "string" and value ~= "", "Expected a non-empty name")
+    return value
+end
+
 local template = Anatomy.anatomyTemplate.recognize(model, {
+    socketNameGuard = guardName,
+    tagGuard = guardName,
 	socketAttribute = "AnatomySocket",
 	tagsAttribute = "AnatomyTags",
 })
 
 local instance = template:instantiate(workspace)
-local host = Anatomy.anatomyHost.new()
+local host = Anatomy.anatomyHost.new({ socketNameGuard = guardName, tagGuard = guardName })
 
 host:push(instance, {
 	id = "rig",

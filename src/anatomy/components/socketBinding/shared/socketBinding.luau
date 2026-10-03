@@ -1,17 +1,17 @@
 --!strict
 --!optimize 2
---!native
 
-local CallbackSet = require(script.Parent.Parent.Parent.Parent.utils.callbackSet)
-local Types = require(script.Parent.Parent.Parent.Parent.types.components.socketBinding)
+local CallbackSet = require(script.Parent.Parent.Parent.Parent.utils.callbackSet.shared.callbackSet)
+local SocketBindingTypes =
+	require(script.Parent.Parent.Parent.Parent.types.components.socketBinding.shared.socketBinding)
 
-export type AnatomySocket<SocketT> = Types.AnatomySocket<SocketT>
-export type MountAttachment = Types.MountAttachment
-export type SocketAttachmentChangedCallback = Types.SocketAttachmentChangedCallback
-export type SocketBinding<SocketT> = Types.SocketBinding<SocketT>
-export type SocketBindingImpl<SocketT> = Types.SocketBindingImpl<SocketT>
-export type SocketBindingSource<SocketT> = Types.SocketBindingSource<SocketT>
-export type SocketChangedCallback<SocketT> = Types.SocketChangedCallback<SocketT>
+type AnatomySocket<SocketT> = SocketBindingTypes.AnatomySocket<SocketT>
+type MountAttachment = SocketBindingTypes.MountAttachment
+type SocketAttachmentChangedCallback = SocketBindingTypes.SocketAttachmentChangedCallback
+type SocketBinding<SocketT> = SocketBindingTypes.SocketBinding<SocketT>
+type SocketBindingImpl<SocketT> = SocketBindingTypes.SocketBindingImpl<SocketT>
+type SocketBindingSource<SocketT> = SocketBindingTypes.SocketBindingSource<SocketT>
+type SocketChangedCallback<SocketT> = SocketBindingTypes.SocketChangedCallback<SocketT>
 
 local SocketBinding = {}
 SocketBinding.__index = SocketBinding
@@ -21,12 +21,13 @@ function SocketBinding.new<SocketT>(
 	source: SocketBindingSource<SocketT>?,
 	initialSocket: AnatomySocket<SocketT>?
 ): SocketBinding<SocketT>
-	local self: SocketBindingImpl<SocketT> = setmetatable({}, SocketBinding) :: any
+	local self: SocketBindingImpl<SocketT> =
+		setmetatable({}, SocketBinding) :: SocketBindingImpl<SocketT>
 
 	self._name = name
 	self._socket = nil
-	self._socketChangedCallbacks = CallbackSet.new()
-	self._attachmentChangedCallbacks = CallbackSet.new()
+	self._socketChangedCallbacks = {}
+	self._attachmentChangedCallbacks = {}
 	self._socketAttachmentDisconnect = nil
 	self._source = source
 	self._sourceDisconnect = nil
@@ -69,6 +70,7 @@ function SocketBinding.bindAttachmentChanged<SocketT>(
 	callback: SocketAttachmentChangedCallback,
 	runInitially: boolean?
 ): () -> ()
+	assert(not self._destroyed, "Cannot subscribe to a destroyed SocketBinding")
 	if runInitially == true then
 		callback(self:getAttachment())
 	end
@@ -81,6 +83,7 @@ function SocketBinding.bindSocketChanged<SocketT>(
 	callback: SocketChangedCallback<SocketT>,
 	runInitially: boolean?
 ): () -> ()
+	assert(not self._destroyed, "Cannot subscribe to a destroyed SocketBinding")
 	if runInitially == true then
 		callback(self:getSocket())
 	end
@@ -88,7 +91,10 @@ function SocketBinding.bindSocketChanged<SocketT>(
 	return CallbackSet.bind(self._socketChangedCallbacks, callback)
 end
 
-function SocketBinding._setSocket<SocketT>(self: SocketBindingImpl<SocketT>, socket: AnatomySocket<SocketT>?): ()
+function SocketBinding._setSocket<SocketT>(
+	self: SocketBindingImpl<SocketT>,
+	socket: AnatomySocket<SocketT>?
+): ()
 	if self._socket == socket then
 		return
 	end
@@ -103,9 +109,12 @@ function SocketBinding._setSocket<SocketT>(self: SocketBindingImpl<SocketT>, soc
 	self._socketAttachmentDisconnect = nil
 
 	if socket ~= nil then
-		self._socketAttachmentDisconnect = socket:bindAttachmentChanged(function(attachment: Attachment?)
-			CallbackSet.fire(self._attachmentChangedCallbacks, attachment)
-		end, false)
+		self._socketAttachmentDisconnect = socket:bindAttachmentChanged(
+			function(attachment: Attachment?)
+				CallbackSet.fire(self._attachmentChangedCallbacks, attachment)
+			end,
+			false
+		)
 	end
 
 	CallbackSet.fire(self._socketChangedCallbacks, socket)
@@ -127,6 +136,9 @@ function SocketBinding.deconstruct<SocketT>(self: SocketBindingImpl<SocketT>): (
 		self._socketAttachmentDisconnect()
 	end
 
+	self._socket = nil
+	CallbackSet.fire(self._socketChangedCallbacks, nil)
+	CallbackSet.fire(self._attachmentChangedCallbacks, nil)
 	table.clear(self._socketChangedCallbacks)
 	table.clear(self._attachmentChangedCallbacks)
 	self._socket = nil

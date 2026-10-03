@@ -20,3 +20,6 @@ build_files = ["src"]
 
 [indices]
 default = "https://github.com/pesde-pkg/index"
+
+[dependencies]
+guard = { repo = "emdomanus/guard", rev = "6d6eab5c06e5b0e68408e9bd6ef1a985cc16806f" }

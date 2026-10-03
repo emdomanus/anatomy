@@ -1,19 +1,25 @@
 --!strict
 --!optimize 2
---!native
 
-local Types = require(script.Parent.Parent.Parent.Parent.types.components.socketMount)
+local SocketEndpointLifecycleTypes = require(
+	script.Parent.Parent.Parent.Parent.types.ports.components.socketEndpoint.shared.socketEndpointLifecycle
+)
+local SocketMountTypes =
+	require(script.Parent.Parent.Parent.Parent.types.components.socketMount.shared.socketMount)
 
-export type MountAttachment = Types.MountAttachment
-export type SocketEndpoint = Types.SocketEndpoint
-export type SocketMount = Types.SocketMount
-export type SocketMountImpl = Types.SocketMountImpl
-export type SocketMountOptions = Types.SocketMountOptions
+type SocketEndpointLifecycle = SocketEndpointLifecycleTypes.SocketEndpointLifecycle
 
-local SocketMount = {}
-SocketMount.__index = SocketMount
+type MountAttachment = SocketMountTypes.MountAttachment
+type SocketEndpoint = SocketMountTypes.SocketEndpoint
+type SocketMount = SocketMountTypes.SocketMount
+type SocketMountImpl = SocketMountTypes.SocketMountImpl
+type SocketMountOptions = SocketMountTypes.SocketMountOptions
 
-local function getConstraintParent(options: SocketMountOptions, from: Attachment?, to: Attachment?): Instance?
+local function getConstraintParent(
+	options: SocketMountOptions,
+	from: Attachment?,
+	to: Attachment?
+): Instance?
 	if options.parent ~= nil then
 		return options.parent
 	end
@@ -27,13 +33,20 @@ local function getConstraintParent(options: SocketMountOptions, from: Attachment
 	return nil
 end
 
-function SocketMount.new(
+local SocketMount = {}
+SocketMount.__index = SocketMount
+
+local function newOwned(
 	fromEndpoint: SocketEndpoint,
 	toEndpoint: SocketEndpoint,
-	options: SocketMountOptions?
+	options: SocketMountOptions?,
+	fromOwned: SocketEndpointLifecycle?,
+	toOwned: SocketEndpointLifecycle?
 ): SocketMount
-	local self: SocketMountImpl = setmetatable({}, SocketMount) :: any
+	local self: SocketMountImpl = setmetatable({}, SocketMount) :: SocketMountImpl
 
+	self._fromOwned = fromOwned
+	self._toOwned = toOwned
 	self._options = options or {}
 	self._name = self._options.name
 	self._fromEndpoint = fromEndpoint
@@ -46,13 +59,19 @@ function SocketMount.new(
 	self._enabled = self._options.enabled ~= false
 	self._destroyed = false
 
-	self._fromAttachmentDisconnect = fromEndpoint:bindAttachmentChanged(function(attachment: Attachment?)
-		self:_setFromAttachment(attachment)
-	end, true)
+	self._fromAttachmentDisconnect = fromEndpoint:bindAttachmentChanged(
+		function(attachment: Attachment?)
+			self:_setFromAttachment(attachment)
+		end,
+		true
+	)
 
-	self._toAttachmentDisconnect = toEndpoint:bindAttachmentChanged(function(attachment: Attachment?)
-		self:_setToAttachment(attachment)
-	end, true)
+	self._toAttachmentDisconnect = toEndpoint:bindAttachmentChanged(
+		function(attachment: Attachment?)
+			self:_setToAttachment(attachment)
+		end,
+		true
+	)
 
 	self:refresh()
 
@@ -76,10 +95,14 @@ function SocketMount.getConstraint(self: SocketMountImpl): RigidConstraint?
 end
 
 function SocketMount.isConnected(self: SocketMountImpl): boolean
-	return self._enabled and self._rigid ~= nil and self._fromAttachment ~= nil and self._toAttachment ~= nil
+	return self._enabled
+		and self._rigid ~= nil
+		and self._fromAttachment ~= nil
+		and self._toAttachment ~= nil
 end
 
 function SocketMount.setEnabled(self: SocketMountImpl, enabled: boolean): ()
+	assert(not self._destroyed, "Cannot use a destroyed SocketMount")
 	if self._enabled == enabled then
 		return
 	end
@@ -89,8 +112,9 @@ function SocketMount.setEnabled(self: SocketMountImpl, enabled: boolean): ()
 end
 
 function SocketMount.refresh(self: SocketMountImpl): ()
-	self._fromAttachment = self._fromEndpoint:getAttachment()
-	self._toAttachment = self._toEndpoint:getAttachment()
+	assert(not self._destroyed, "Cannot use a destroyed SocketMount")
+	self._fromAttachment = (self._fromEndpoint :: SocketEndpoint):getAttachment()
+	self._toAttachment = (self._toEndpoint :: SocketEndpoint):getAttachment()
 	self:_reconcileConstraint()
 end
 
@@ -150,6 +174,15 @@ function SocketMount.deconstruct(self: SocketMountImpl): ()
 		self._toAttachmentDisconnect()
 	end
 
+	if self._fromOwned ~= nil then
+		self._fromOwned:deconstruct()
+	end
+	if self._toOwned ~= nil then
+		self._toOwned:deconstruct()
+	end
+	self._fromOwned = nil
+	self._toOwned = nil
+
 	if self._rigid ~= nil then
 		self._rigid:Destroy()
 	end
@@ -157,10 +190,17 @@ function SocketMount.deconstruct(self: SocketMountImpl): ()
 	self._fromAttachment = nil
 	self._toAttachment = nil
 	self._rigid = nil
-	self._fromEndpoint = nil :: any
-	self._toEndpoint = nil :: any
+	self._fromEndpoint = nil
+	self._toEndpoint = nil
 	self._fromAttachmentDisconnect = nil
 	self._toAttachmentDisconnect = nil
 end
 
-return SocketMount
+local function new(
+	fromEndpoint: SocketEndpoint,
+	toEndpoint: SocketEndpoint,
+	options: SocketMountOptions?
+): SocketMount
+	return newOwned(fromEndpoint, toEndpoint, options, nil, nil)
+end
+return { new = new, newOwned = newOwned }

@@ -7,8 +7,17 @@
       "packages": {
         "$className": "Folder",
         "anatomy": {
-          "$path": "src"
+          "src": {
+            "$path": "src"
+          },
+          "roblox_packages": {
+            "$path": "roblox_packages"
+          },
+          "$className": "Folder"
         }
+      },
+      "anatomyDevTypes": {
+        "$path": "dev/types"
       }
     },
     "StarterPlayer": {

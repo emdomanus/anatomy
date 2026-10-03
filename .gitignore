@@ -11,3 +11,5 @@ lune_packages/
 node_modules/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+.verification/
+scripts/luau-lsp/globalTypes.d.luau

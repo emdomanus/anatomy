@@ -1,45 +1,86 @@
 --!strict
 --!optimize 2
---!native
 
-local Anatomy = require(script.anatomy)
-local Types = require(script.anatomy.types)
+local AnatomyHostModule = require(script.anatomy.managers.anatomyHost.shared.anatomyHost)
+local AnatomyTemplateModule =
+	require(script.anatomy.components.anatomyTemplate.shared.anatomyTemplate)
+local SocketEndpointModule = require(script.anatomy.components.socketEndpoint.shared.socketEndpoint)
+local SocketMountModule = require(script.anatomy.components.socketMount.shared.socketMount)
+local AnatomyTypes = require(script.anatomy.types.def.anatomy.shared.anatomy)
+local AnatomyHostTypes = require(script.anatomy.types.managers.anatomyHost.shared.anatomyHost)
+local AnatomyHostLayerTypes =
+	require(script.anatomy.types.components.anatomyHostLayer.shared.anatomyHostLayer)
+local SocketEndpointTypes =
+	require(script.anatomy.types.ports.components.socketEndpoint.shared.socketEndpoint)
+local AnatomyTemplateTypes =
+	require(script.anatomy.types.components.anatomyTemplate.shared.anatomyTemplate)
+local AnatomyInstanceTypes =
+	require(script.anatomy.types.components.anatomyInstance.shared.anatomyInstance)
+local AnatomySocketTypes =
+	require(script.anatomy.types.components.anatomySocket.shared.anatomySocket)
+local AnatomyTaggedElementTypes =
+	require(script.anatomy.types.components.anatomyTaggedElement.shared.anatomyTaggedElement)
+local SocketBindingTypes =
+	require(script.anatomy.types.components.socketBinding.shared.socketBinding)
+local SocketMountTypes = require(script.anatomy.types.components.socketMount.shared.socketMount)
+local SocketSubscriptionTypes =
+	require(script.anatomy.types.ports.managers.anatomyHost.shared.socketSubscription)
+local AnatomySocketLookupTypes =
+	require(script.anatomy.types.ports.components.anatomyInstance.shared.anatomySocketLookup)
 
-export type AnatomyCategory = Types.AnatomyCategory
-export type AnatomyId = Types.AnatomyId
-export type LayerId = Types.LayerId
-export type AnatomyPathStep = Types.AnatomyPathStep
-export type AnatomyPath = Types.AnatomyPath
-export type MountAttachment = Types.MountAttachment
-export type DescriptorMetadata = Types.DescriptorMetadata
-export type NameGuard<TName> = Types.NameGuard<TName>
-export type SocketDescriptor<SocketT> = Types.SocketDescriptor<SocketT>
-export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
-export type RecognizeOptions<SocketT, TagT> = Types.RecognizeOptions<SocketT, TagT>
-export type RecognizeConfig<SocketT, TagT> = Types.RecognizeConfig<SocketT, TagT>
-export type InstancePolicy = Types.InstancePolicy
-export type SocketEndpoint = Types.SocketEndpoint
-export type SocketAttachmentChangedCallback = Types.SocketAttachmentChangedCallback
-export type SocketChangedCallback<SocketT> = Types.SocketChangedCallback<SocketT>
-
-export type AnatomySocket<SocketT> = Types.AnatomySocket<SocketT>
-export type AnatomyTaggedElement<TagT> = Types.AnatomyTaggedElement<TagT>
-export type AnatomyTemplate<SocketT, TagT> = Types.AnatomyTemplate<SocketT, TagT>
-export type AnatomyInstance<SocketT, TagT> = Types.AnatomyInstance<SocketT, TagT>
-export type SocketBinding<SocketT> = Types.SocketBinding<SocketT>
-export type SocketMount = Types.SocketMount
-export type SocketMountOptions = Types.SocketMountOptions
-
-export type AnatomyHost<SocketT, TagT> = Types.AnatomyHost<SocketT, TagT>
-export type AnatomyHostOptions<SocketT> = Types.AnatomyHostOptions<SocketT>
-export type AnatomyHostLayer<SocketT, TagT> = Types.AnatomyHostLayer<SocketT, TagT>
-export type AnatomyHostLayerOptions = Types.AnatomyHostLayerOptions
-export type AnatomyHostSocketQuery = Types.AnatomyHostSocketQuery
-export type AnatomyHostTagQuery = Types.AnatomyHostTagQuery
-export type AnatomyHostSocketAddress<SocketT> = Types.AnatomyHostSocketAddress<SocketT>
-export type AnatomyInstanceSocketAddress<SocketT, TagT> = Types.AnatomyInstanceSocketAddress<SocketT, TagT>
-export type AnatomyHostMountEndpoint<SocketT, TagT> = Types.AnatomyHostMountEndpoint<SocketT, TagT>
-export type AnatomyHostMountConfig<SocketT, TagT> = Types.AnatomyHostMountConfig<SocketT, TagT>
-export type TagChangedCallback<TagT> = Types.TagChangedCallback<TagT>
-
-return Anatomy
+export type AnatomyCategory = AnatomyTypes.AnatomyCategory
+export type AnatomyId = AnatomyTypes.AnatomyId
+export type LayerId = AnatomyTypes.LayerId
+export type AnatomyPathStep = AnatomyTypes.AnatomyPathStep
+export type AnatomyPath = AnatomyTypes.AnatomyPath
+export type DescriptorMetadata = AnatomyTypes.DescriptorMetadata
+export type InstancePolicy = AnatomyTypes.InstancePolicy
+export type NameGuard<TName> = AnatomyTypes.NameGuard<TName>
+export type SocketDescriptor<SocketT> = AnatomyTypes.SocketDescriptor<SocketT>
+export type TagDescriptor<TagT> = AnatomyTypes.TagDescriptor<TagT>
+export type RecognizeOptions<SocketT, TagT> = AnatomyTypes.RecognizeOptions<SocketT, TagT>
+export type RecognizeConfig<SocketT, TagT> = AnatomyTypes.RecognizeConfig<SocketT, TagT>
+export type AnatomyHost<SocketT, TagT> = AnatomyHostTypes.AnatomyHost<SocketT, TagT>
+export type AnatomyHostOptions<SocketT, TagT> = AnatomyHostTypes.AnatomyHostOptions<SocketT, TagT>
+export type AnatomyHostSocketAddress<SocketT> = AnatomyHostTypes.AnatomyHostSocketAddress<SocketT>
+export type AnatomyInstanceSocketAddress<SocketT, TagT> =
+	AnatomyHostTypes.AnatomyInstanceSocketAddress<SocketT, TagT>
+export type AnatomyHostMountEndpoint<SocketT, TagT> = AnatomyHostTypes.AnatomyHostMountEndpoint<
+	SocketT,
+	TagT
+>
+export type AnatomyHostMountConfig<SocketT, TagT> = AnatomyHostTypes.AnatomyHostMountConfig<
+	SocketT,
+	TagT
+>
+export type TagChangedCallback<TagT> = AnatomyHostTypes.TagChangedCallback<TagT>
+export type AnatomyHostSocketQuery = AnatomyHostTypes.AnatomyHostSocketQuery
+export type AnatomyHostTagQuery = AnatomyHostTypes.AnatomyHostTagQuery
+export type AnatomyHostLayer<SocketT, TagT> = AnatomyHostLayerTypes.AnatomyHostLayer<SocketT, TagT>
+export type AnatomyHostLayerOptions = AnatomyHostLayerTypes.AnatomyHostLayerOptions
+export type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
+export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
+export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
+export type SocketBinding<SocketT> = SocketBindingTypes.SocketBinding<SocketT>
+export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
+	AnatomyTemplate<SocketT, TagT>,
+	SocketT,
+	TagT
+>
+export type MountAttachment = SocketEndpointTypes.MountAttachment
+export type SocketEndpoint = SocketEndpointTypes.SocketEndpoint
+export type SocketAttachmentChangedCallback = SocketEndpointTypes.SocketAttachmentChangedCallback
+export type SocketMount = SocketMountTypes.SocketMount
+export type SocketMountOptions = SocketMountTypes.SocketMountOptions
+export type SocketChangedCallback<SocketT> = SocketSubscriptionTypes.SocketChangedCallback<SocketT>
+export type SocketSubscription<SocketT> = SocketSubscriptionTypes.SocketSubscription<SocketT>
+export type AnatomySocketLookup<SocketT> = AnatomySocketLookupTypes.AnatomySocketLookup<SocketT>
+return {
+	anatomyHost = { new = AnatomyHostModule.new },
+	anatomyTemplate = {
+		new = AnatomyTemplateModule.new,
+		recognize = AnatomyTemplateModule.recognize,
+	},
+	socketEndpoint = { fromAttachment = SocketEndpointModule.fromAttachment },
+	socketMount = { new = SocketMountModule.new },
+}

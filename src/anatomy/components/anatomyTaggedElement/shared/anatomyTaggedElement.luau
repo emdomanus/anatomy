@@ -1,28 +1,30 @@
 --!strict
 --!optimize 2
---!native
 
-local Types = require(script.Parent.Parent.Parent.Parent.types.components.anatomyTaggedElement)
+local AnatomyTaggedElementTypes = require(
+	script.Parent.Parent.Parent.Parent.types.components.anatomyTaggedElement.shared.anatomyTaggedElement
+)
+local AnatomyTypes = require(script.Parent.Parent.Parent.Parent.types.def.anatomy.shared.anatomy)
 
-export type AnatomyPath = Types.AnatomyPath
-export type AnatomyTaggedElement<TagT> = Types.AnatomyTaggedElement<TagT>
-export type AnatomyTaggedElementImpl<OwnerT, TagT> = Types.AnatomyTaggedElementImpl<OwnerT, TagT>
-export type TagDescriptor<TagT> = Types.TagDescriptor<TagT>
+type AnatomyPath = AnatomyTypes.AnatomyPath
+type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
+type AnatomyTaggedElementOwned<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElementOwned<TagT>
+type AnatomyTaggedElementImpl<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT>
+type TagDescriptor<TagT> = AnatomyTypes.TagDescriptor<TagT>
 
 local AnatomyTaggedElement = {}
 AnatomyTaggedElement.__index = AnatomyTaggedElement
 
-function AnatomyTaggedElement.new<OwnerT, TagT>(
-	owner: OwnerT,
+function AnatomyTaggedElement.new<TagT>(
 	path: AnatomyPath,
 	tags: { [TagT]: true },
 	prefixes: { [string]: true },
 	instance: Instance?,
 	tagPathDelimiter: string
-): AnatomyTaggedElement<TagT>
-	local self: AnatomyTaggedElementImpl<OwnerT, TagT> = setmetatable({}, AnatomyTaggedElement) :: any
+): AnatomyTaggedElementOwned<TagT>
+	local self: AnatomyTaggedElementImpl<TagT> =
+		setmetatable({}, AnatomyTaggedElement) :: AnatomyTaggedElementImpl<TagT>
 
-	self._owner = owner
 	self._path = path
 	self._tags = tags
 	self._prefixes = prefixes
@@ -33,20 +35,25 @@ function AnatomyTaggedElement.new<OwnerT, TagT>(
 	return self
 end
 
-function AnatomyTaggedElement.fromDescriptor<OwnerT, TagT>(
-	owner: OwnerT,
+function AnatomyTaggedElement.fromDescriptor<TagT>(
 	descriptor: TagDescriptor<TagT>,
 	instance: Instance?,
 	tagPathDelimiter: string
-): AnatomyTaggedElement<TagT>
-	return AnatomyTaggedElement.new(owner, descriptor.path, descriptor.tags, descriptor.prefixes, instance, tagPathDelimiter)
+): AnatomyTaggedElementOwned<TagT>
+	return AnatomyTaggedElement.new(
+		descriptor.path,
+		descriptor.tags,
+		descriptor.prefixes,
+		instance,
+		tagPathDelimiter
+	)
 end
 
-function AnatomyTaggedElement.getInstance<OwnerT, TagT>(self: AnatomyTaggedElementImpl<OwnerT, TagT>): Instance
+function AnatomyTaggedElement.getInstance<TagT>(self: AnatomyTaggedElementImpl<TagT>): Instance
 	return self._instance :: Instance
 end
 
-function AnatomyTaggedElement.getTags<OwnerT, TagT>(self: AnatomyTaggedElementImpl<OwnerT, TagT>): { [TagT]: true }
+function AnatomyTaggedElement.getTags<TagT>(self: AnatomyTaggedElementImpl<TagT>): { [TagT]: true }
 	if self._destroyed then
 		return {}
 	end
@@ -54,10 +61,7 @@ function AnatomyTaggedElement.getTags<OwnerT, TagT>(self: AnatomyTaggedElementIm
 	return table.clone(self._tags)
 end
 
-function AnatomyTaggedElement.hasTag<OwnerT, TagT>(
-	self: AnatomyTaggedElementImpl<OwnerT, TagT>,
-	prefix: string
-): boolean
+function AnatomyTaggedElement.hasTag<TagT>(self: AnatomyTaggedElementImpl<TagT>, prefix: string): boolean
 	if self._destroyed then
 		return false
 	end
@@ -65,8 +69,8 @@ function AnatomyTaggedElement.hasTag<OwnerT, TagT>(
 	return self._prefixes[prefix] == true
 end
 
-function AnatomyTaggedElement.getLeafUnder<OwnerT, TagT>(
-	self: AnatomyTaggedElementImpl<OwnerT, TagT>,
+function AnatomyTaggedElement.getLeafUnder<TagT>(
+	self: AnatomyTaggedElementImpl<TagT>,
 	prefix: string
 ): string?
 	if self._destroyed then
@@ -81,7 +85,7 @@ function AnatomyTaggedElement.getLeafUnder<OwnerT, TagT>(
 			continue
 		end
 
-		local tagPath = (tag :: any) :: string
+		local tagPath = tag :: string
 		if string.sub(tagPath, 1, needleLength) == needle then
 			return string.sub(tagPath, needleLength + 1)
 		end
@@ -90,14 +94,13 @@ function AnatomyTaggedElement.getLeafUnder<OwnerT, TagT>(
 	return nil
 end
 
-function AnatomyTaggedElement.deconstruct<OwnerT, TagT>(self: AnatomyTaggedElementImpl<OwnerT, TagT>): ()
+function AnatomyTaggedElement.deconstruct<TagT>(self: AnatomyTaggedElementImpl<TagT>): ()
 	if self._destroyed then
 		return
 	end
 
 	self._destroyed = true
 	self._instance = nil
-	self._owner = nil
 end
 
 return AnatomyTaggedElement

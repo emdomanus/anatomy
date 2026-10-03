@@ -62,25 +62,25 @@ The exact public surface is re-exported from [`src/init.luau`](https://github.co
 
 ## AnatomyCategory
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 String category for grouping templates and host layers, such as `"rig"` or `"weapon"`.
 
 ## AnatomyId
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 String identifier used by recognized templates and other anatomy-owned records.
 
 ## LayerId
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 String identifier for a pushed host layer. Layer ids are used by socket queries and reactive mounts.
 
 ## AnatomyPathStep
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 One resolved step in a structural path from a recognized root.
 
@@ -94,35 +94,36 @@ export type AnatomyPathStep = {
 
 ## AnatomyPath
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 Array of [`AnatomyPathStep`](#anatomypathstep) entries used to resolve a descriptor against a cloned or wrapped instance.
 
 ## DescriptorMetadata
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 Loose metadata map carried by descriptors and templates.
 
 ## NameGuard
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
-Predicate used to validate authored socket names before they enter the typed API.
+Identity-preserving guard for socket and tag names. It accepts `unknown`, returns
+the accepted typed value, and throws on rejection; it does not return a boolean.
 
 ```luau
-export type NameGuard<TName> = (name: string) -> boolean
+export type NameGuard<TName> = Guard.GuardFn<TName> -- (unknown) -> TName; throws on rejection
 ```
 
 ## InstancePolicy
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 Optional part policy applied when a template instantiates a clone.
 
 ## SocketDescriptor
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 Template-time socket record. It stores the socket name, structural path, and optional metadata.
 
@@ -136,13 +137,13 @@ export type SocketDescriptor<SocketT> = {
 
 ## TagDescriptor
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 Template-time tag record. It stores the tagged element path, accepted typed tags, and query prefixes.
 
 ## RecognizeOptions
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 Configuration for `Anatomy.anatomyTemplate.recognize`.
 
@@ -155,8 +156,8 @@ export type RecognizeOptions<SocketT, TagT> = {
 	tagsAttribute: string?,
 	tagDelimiter: string?,
 	tagPathDelimiter: string?,
-	socketNameGuard: NameGuard<SocketT>?,
-	tagGuard: ((path: string) -> TagT?)?,
+	socketNameGuard: NameGuard<SocketT>,
+	tagGuard: NameGuard<TagT>,
 
 	instancePolicy: InstancePolicy?,
 
@@ -164,83 +165,83 @@ export type RecognizeOptions<SocketT, TagT> = {
 }
 ```
 
-Use `socketNameGuard` and `tagGuard` when a consuming game wants a closed vocabulary instead of raw strings.
+Both guards are required. Their typed return values infer the socket and tag generics. A guard must preserve identity and throw on invalid input; a string guard provides an unrestricted vocabulary.
 
 ## RecognizeConfig
 
-Source: [`src/anatomy/types/def/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/init.luau)
+Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
 
 Alias of [`RecognizeOptions`](#recognizeoptions), used internally once recognition options are normalized.
 
 ## MountAttachment
 
-Source: [`src/anatomy/types/components/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketEndpoint.luau)
+Source: [`src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau)
 
 Alias for the Roblox `Attachment` instance used by socket endpoints and mounts.
 
 ## SocketEndpoint
 
-Source: [`src/anatomy/types/components/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketEndpoint.luau)
+Source: [`src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau)
 
 Common interface for anything that can provide a current mount attachment and notify when it changes.
 
 ## SocketAttachmentChangedCallback
 
-Source: [`src/anatomy/types/components/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketEndpoint.luau)
+Source: [`src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/components/socketEndpoint/shared/socketEndpoint.luau)
 
 Callback fired when an endpoint's current attachment changes.
 
 ## SocketChangedCallback
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Callback used by host socket watchers and socket bindings when a socket resolves, retargets, or clears.
 
 ## AnatomySocket
 
-Source: [`src/anatomy/types/components/anatomySocket.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomySocket.luau)
+Source: [`src/anatomy/types/components/anatomySocket/shared/anatomySocket.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomySocket/shared/anatomySocket.luau)
 
 Runtime socket resolved from a [`SocketDescriptor`](#socketdescriptor). It behaves as a [`SocketEndpoint`](#socketendpoint).
 
 ## AnatomyTaggedElement
 
-Source: [`src/anatomy/types/components/anatomyTaggedElement.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyTaggedElement.luau)
+Source: [`src/anatomy/types/components/anatomyTaggedElement/shared/anatomyTaggedElement.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyTaggedElement/shared/anatomyTaggedElement.luau)
 
 Runtime tagged element resolved from a [`TagDescriptor`](#tagdescriptor). Host and instance tag queries return these.
 
 ## AnatomyTemplate
 
-Source: [`src/anatomy/types/components/anatomyTemplate.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyTemplate.luau)
+Source: [`src/anatomy/types/components/anatomyTemplate/shared/anatomyTemplate.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyTemplate/shared/anatomyTemplate.luau)
 
 Recognized asset description. Templates store descriptor paths and can instantiate clones or wrap existing roots.
 
 ## AnatomyInstance
 
-Source: [`src/anatomy/types/components/anatomyInstance.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyInstance.luau)
+Source: [`src/anatomy/types/components/anatomyInstance/shared/anatomyInstance.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyInstance/shared/anatomyInstance.luau)
 
 Live clone or wrapped model resolved against an [`AnatomyTemplate`](#anatomytemplate).
 
 ## SocketBinding
 
-Source: [`src/anatomy/types/components/socketBinding.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketBinding.luau)
+Source: [`src/anatomy/types/components/socketBinding/shared/socketBinding.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketBinding/shared/socketBinding.luau)
 
 Reactive endpoint returned by `host:socket(...)`. It follows the host socket resolution as layers change.
 
 ## SocketMount
 
-Source: [`src/anatomy/types/components/socketMount.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketMount.luau)
+Source: [`src/anatomy/types/components/socketMount/shared/socketMount.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketMount/shared/socketMount.luau)
 
 Runtime socket-to-socket mount backed by a `RigidConstraint`.
 
 ## SocketMountOptions
 
-Source: [`src/anatomy/types/components/socketMount.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketMount.luau)
+Source: [`src/anatomy/types/components/socketMount/shared/socketMount.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketMount/shared/socketMount.luau)
 
 Options for creating a [`SocketMount`](#socketmount), including the constraint name and parent.
 
 ## AnatomyHost
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Main runtime aggregation API. It accepts anatomy instances as ordered layers, resolves sockets, resolves tag prefixes, creates bindings, and creates mounts.
 
@@ -275,55 +276,57 @@ The excerpt above is smaller than the full type. Keep the source type as the exa
 
 ## AnatomyHostOptions
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
-Options for constructing a host.
+Options for constructing a host. Both generic arguments are inferred from the
+required typed guard returns. The option fields are read-only to Anatomy, allowing
+it to consume ordinary caller tables or frozen configuration without mutation.
 
 ## AnatomyHostLayer
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Handle returned by `host:push(...)`. It exposes layer priority, the pushed instance, and removal.
 
 ## AnatomyHostLayerOptions
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Options for pushing an anatomy instance onto a host.
 
 ## AnatomyHostSocketQuery
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Socket lookup filter for layer id and override behavior.
 
 ## AnatomyHostTagQuery
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Tag lookup filter. It currently matches [`AnatomyHostSocketQuery`](#anatomyhostsocketquery).
 
 ## AnatomyHostSocketAddress
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Mount endpoint address for resolving a socket through a host.
 
 ## AnatomyInstanceSocketAddress
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Mount endpoint address for resolving a socket directly from a specific anatomy instance.
 
 ## AnatomyHostMountEndpoint
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Union of all endpoint forms accepted by `host:mount(...)`: host socket address, instance socket address, [`AnatomySocket`](#anatomysocket), [`SocketBinding`](#socketbinding), or raw `Attachment`.
 
 ## AnatomyHostMountConfig
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Config object for connecting two mount endpoints.
 
@@ -345,6 +348,30 @@ local mountConfig: Anatomy.AnatomyHostMountConfig<string, string> = {
 
 ## TagChangedCallback
 
-Source: [`src/anatomy/types/managers/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost.luau)
+Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
 
 Callback used by `host:bindByTag(...)` when tagged elements enter or leave a watched prefix.
+
+## Guard and ownership migration
+
+`AnatomyHostOptions<SocketT, TagT>` requires both `socketNameGuard: NameGuard<SocketT>`
+and `tagGuard: NameGuard<TagT>`. `anatomyHost.new(options)` infers both generic arguments
+from their return types. `NameGuard<T>` re-exports the standalone Guard package's
+`GuardFn<T>`, whose signature is `(unknown) -> T`. Invalid values throw. Recognition
+options and instance policy fields likewise expose read-only consumption contracts.
+
+`AnatomySocket` and `AnatomyTaggedElement` are borrowed views. Only their instance
+owner receives the internal `Owned` contracts with `deconstruct`. A layer handle's
+`id` is read-only; removal is idempotent and a retired handle cannot affect its replacement.
+Reprioritizing a retired handle fails. `AnatomyInstance:getTaggedElements()` returns a
+snapshot of all borrowed tagged elements, including those needed for host ingress validation.
+
+Public ports are `SocketEndpoint`, `SocketSubscription<SocketT>`, and
+`AnatomySocketLookup<SocketT>`. Mounts accept any structural `SocketEndpoint`;
+instance socket addresses only require `AnatomySocketLookup`, independent of template internals.
+The internal host layer command and endpoint lifecycle ports are not package exports.
+
+Templates snapshot configuration and descriptor tables. Descriptor records, path steps,
+paths, tag sets, and prefix sets are frozen; metadata receives a shallow frozen snapshot
+(nested arbitrary metadata values remain caller-owned). The source Roblox Instance remains live.
+Collection-returning getters retain their existing snapshot semantics.

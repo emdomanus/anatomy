@@ -4,3 +4,12 @@ format = 2
 name = "emdomanus/anatomy"
 version = "0.2.0"
 target = "roblox"
+
+[graph."emdomanus/guard@0.0.0-68fd055678825ae339ff2ecada278f86cbf50ef8 roblox"]
+direct = ["guard", { repo = "https://github.com/emdomanus/guard", rev = "6d6eab5c06e5b0e68408e9bd6ef1a985cc16806f" }, "standard"]
+
+[graph."emdomanus/guard@0.0.0-68fd055678825ae339ff2ecada278f86cbf50ef8 roblox".pkg_ref]
+ref_ty = "git"
+repo = "https://github.com/emdomanus/guard"
+tree_id = "68fd055678825ae339ff2ecada278f86cbf50ef8"
+new_structure = true
