@@ -1,5 +1,7 @@
 # Anatomy allocation checkpoint â€” 2026-10-03
 
+Historical checkpoint: the watcher and unordered-tag API below is superseded by [direct subscriptions](./direct-subscriptions-review-2026-10-04.md).
+
 This is a historical checkpoint. The current contract and verification are in the
 [source-model checkpoint](./source-model-review-2026-10-03.md).
 

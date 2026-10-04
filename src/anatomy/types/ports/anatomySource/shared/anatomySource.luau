@@ -7,6 +7,7 @@ local TaggedTypes = require(
 local SubscriptionTypes =
 	require(script.Parent.Parent.Parent.managers.anatomyHost.shared.socketSubscription)
 export type TaggedCallback<TagT> = (TaggedTypes.AnatomyTaggedElement<TagT>) -> ()
+export type TaggedChangedCallback<TagT> = (TaggedTypes.AnatomyTaggedElement<TagT>?) -> ()
 export type AnatomySource<SocketT, TagT> = SubscriptionTypes.SocketSubscription<SocketT> & {
 	read getSocket: (
 		self: AnatomySource<SocketT, TagT>,
@@ -16,6 +17,22 @@ export type AnatomySource<SocketT, TagT> = SubscriptionTypes.SocketSubscription<
 		self: AnatomySource<SocketT, TagT>,
 		prefix: string
 	) -> { TaggedTypes.AnatomyTaggedElement<TagT> },
+	read getTopTagged: (
+		self: AnatomySource<SocketT, TagT>,
+		prefix: string
+	) -> TaggedTypes.AnatomyTaggedElement<TagT>?,
+	read bindTopTaggedChanged: (
+		self: AnatomySource<SocketT, TagT>,
+		prefix: string,
+		callback: TaggedChangedCallback<TagT>,
+		runInitially: boolean?
+	) -> () -> (),
+	read bindToSocket: (
+		self: AnatomySource<SocketT, TagT>,
+		name: SocketT,
+		callback: SubscriptionTypes.SocketChangedCallback<SocketT>,
+		runInitially: boolean?
+	) -> () -> (),
 	read bindTaggedAdded: (
 		self: AnatomySource<SocketT, TagT>,
 		callback: TaggedCallback<TagT>,

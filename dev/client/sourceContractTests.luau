@@ -1,7 +1,7 @@
 --!strict
 --!optimize 2
 local Anatomy = require(game.ReplicatedStorage.packages.anatomy.src)
-local bindMountWatchers = require(script.Parent.bindMountWatchers)
+local bindMountSockets = require(script.Parent.bindMountSockets)
 
 type Name = "grip"
 type Tag = "body.hand"
@@ -59,9 +59,13 @@ local function run(): ()
 	-- No constructor assertion: both generics must infer from guards.
 	local inferred = Anatomy.anatomyHost.new({ socketNameGuard = socketGuard, tagGuard = tagGuard })
 	local typed: Anatomy.AnatomyHost<Name, Tag> = inferred
-	local watched = typed:watchSocket("grip" :: Name)
-	check(watched:getSocket() == nil, "Empty watcher must be nil")
-	watched:deconstruct()
+	local initial = 0
+	local releaseTyped = typed:bindToSocket("grip" :: Name, function(socket)
+		check(socket == nil, "Empty subscription must publish nil")
+		initial += 1
+	end, true)
+	check(initial == 1, "Missing initial nil")
+	releaseTyped()
 	typed:deconstruct()
 	local typedAsset = Instance.new("Attachment")
 	typedAsset:SetAttribute("Socket", "grip")
@@ -127,9 +131,8 @@ local function run(): ()
 	child:push(instanceView)
 	host:push(sourceView, 10)
 	check(host:getSocket("grip") == socketA, "Nested initial enumeration failed")
-	local watcher = host:watchSocket("grip")
 	local mount = host:mount(nil, nil)
-	local disconnectMount = bindMountWatchers(mount, watcher, watcher)
+	local disconnectMount = bindMountSockets(mount, host, "grip", "grip")
 	check(mount:getFromAttachment() == socketA:getAttachment(), "Owner mount did not initialize")
 	local changes = 0
 	local releaseSocket = host:bindSocketChanged(function(name, _socket)
@@ -137,10 +140,7 @@ local function run(): ()
 		changes += 1
 	end)
 	child:push(b, 5)
-	check(
-		host:getSocket("grip") == socketB and watcher:getSocket() == socketB,
-		"Nested replacement failed"
-	)
+	check(host:getSocket("grip") == socketB, "Nested replacement failed")
 	check(changes == 1, "Replacement emitted duplicate notifications")
 	host:push(c, 0)
 	check(changes == 1, "Nonwinning source emitted a socket change")
@@ -193,7 +193,7 @@ local function run(): ()
 	)
 	host:remove(c)
 	check(
-		watcher:getSocket() == nil and not mount:isConnected(),
+		host:getSocket("grip") == nil and not mount:isConnected(),
 		"Empty selection did not clear owner mount"
 	)
 	-- Reentrant removal during publication must not leave subscriptions or membership.
@@ -227,6 +227,15 @@ local function run(): ()
 		getTagged = function(_self, prefix)
 			queryCount += 1
 			return provider:getTagged(prefix)
+		end,
+		getTopTagged = function(_self, prefix)
+			return provider:getTopTagged(prefix)
+		end,
+		bindTopTaggedChanged = function(_self, prefix, callback, initially)
+			return provider:bindTopTaggedChanged(prefix, callback, initially)
+		end,
+		bindToSocket = function(_self, name, callback, initially)
+			return provider:bindToSocket(name, callback, initially)
 		end,
 		bindSocketChanged = function(_self, callback, initially)
 			return provider:bindSocketChanged(callback, initially)
@@ -286,7 +295,7 @@ local function run(): ()
 	disconnectMount()
 	host:deconstruct()
 	check(
-		watcher:getSocket() == nil and mount:getConstraint() == nil,
+		host:getSocket("grip") == nil and mount:getConstraint() == nil,
 		"Host-owned resources survived teardown"
 	)
 	child:push(a)
@@ -298,7 +307,7 @@ local function run(): ()
 		host:push(a)
 	end)
 	reject(function()
-		host:watchSocket("grip")
+		host:bindToSocket("grip", function() end)
 	end)
 	a:deconstruct()
 	b:deconstruct()

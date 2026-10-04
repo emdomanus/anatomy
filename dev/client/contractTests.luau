@@ -81,6 +81,7 @@ end
 local function run()
 	testExplicitMount()
 	require(script.Parent.sourceContractTests)()
+	require(script.Parent.taggedSelectionContractTests)()
 end
 
 return run

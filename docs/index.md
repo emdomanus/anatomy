@@ -20,6 +20,7 @@ local host = Anatomy.anatomyHost.new({ socketNameGuard = guardName, tagGuard = g
 host:push(instance, 10)
 local socket = host:getSocket("rightGrip")
 local effects = host:getTagged("effect")
+local topEffect = host:getTopTagged("effect")
 host:remove(instance)
 host:deconstruct()
 instance:deconstruct()
@@ -27,6 +28,7 @@ instance:deconstruct()
 
 - [Public contracts](./types.md)
 - [Architecture and ownership](./ARCHITECTURE.md)
+- [Direct subscriptions and ordered tags](./direct-subscriptions-review-2026-10-04.md)
 - [Source-model migration receipt](./source-model-review-2026-10-03.md)
 
 Anatomy owns recognition, composition, and mounting primitives. It does not own gameplay,

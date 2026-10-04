@@ -69,6 +69,8 @@ local function addTaggedElementToIndex<TagT>(
 	end
 end
 
+local function disconnectStatic(): () end
+
 local AnatomyInstance = {}
 AnatomyInstance.__index = AnatomyInstance
 
@@ -151,7 +153,41 @@ function AnatomyInstance.getTagged<SocketT, TagT>(
 	return result
 end
 
-local function disconnectStatic(): () end
+function AnatomyInstance.getTopTagged<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	prefix: string
+): AnatomyTaggedElement<TagT>?
+	local elements = self._tagPrefixIndex[prefix]
+	return if elements then elements[#elements] else nil
+end
+
+function AnatomyInstance.bindTopTaggedChanged<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	prefix: string,
+	callback: (
+		AnatomyTaggedElement<TagT>?
+	) -> (),
+	runInitially: boolean?
+): () -> ()
+	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyInstance")
+	if runInitially then
+		callback(self:getTopTagged(prefix))
+	end
+	return disconnectStatic
+end
+
+function AnatomyInstance.bindToSocket<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	name: SocketT,
+	callback: (AnatomySocket<SocketT>?) -> (),
+	runInitially: boolean?
+): () -> ()
+	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyInstance")
+	if runInitially then
+		callback(self:getSocket(name))
+	end
+	return disconnectStatic
+end
 
 function AnatomyInstance.bindSocketChanged<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>,

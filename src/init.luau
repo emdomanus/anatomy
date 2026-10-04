@@ -16,8 +16,6 @@ local AnatomySocketTypes =
 	require(script.anatomy.types.components.anatomySocket.shared.anatomySocket)
 local AnatomyTaggedElementTypes =
 	require(script.anatomy.types.components.anatomyTaggedElement.shared.anatomyTaggedElement)
-local SocketWatcherTypes =
-	require(script.anatomy.types.components.socketWatcher.shared.socketWatcher)
 local SocketMountTypes = require(script.anatomy.types.components.socketMount.shared.socketMount)
 local SocketSubscriptionTypes =
 	require(script.anatomy.types.ports.managers.anatomyHost.shared.socketSubscription)
@@ -36,7 +34,7 @@ export type AnatomyHostOptions<SocketT, TagT> = AnatomyHostTypes.AnatomyHostOpti
 export type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
 export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 export type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
-export type SocketWatcher<SocketT> = SocketWatcherTypes.SocketWatcher<SocketT>
+export type TaggedChangedCallback<TagT> = AnatomySourceTypes.TaggedChangedCallback<TagT>
 export type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
 	AnatomyTemplate<SocketT, TagT>,
 	SocketT,

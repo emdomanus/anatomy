@@ -109,32 +109,18 @@ local function count(entries)
 	return result
 end
 
-local bindMountWatchers = loadModule(root.dev.client.bindMountWatchers)
+local bindMountSockets = loadModule(root.dev.client.bindMountSockets)
 local host = Anatomy.anatomyHost.new({ socketNameGuard = guardString, tagGuard = guardString })
 for _ = 1, 20 do
-	local from = host:watchSocket("from")
-	local to = host:watchSocket("to")
 	local mount = host:mount(nil, nil)
-	assert(
-		count(from._socketChangedCallbacks) == 0 and count(to._socketChangedCallbacks) == 0,
-		"Core mount installed subscriptions"
-	)
-	local disconnectMount = bindMountWatchers(mount, from, to)
-	assert(count(host._socketChangedCallbacks) == 2, "Expected two caller-owned subscriptions")
-	assert(count(from._socketChangedCallbacks) == 1, "Owner did not subscribe to source")
-	assert(count(to._socketChangedCallbacks) == 1, "Owner did not subscribe to target")
+	local disconnectMount = bindMountSockets(mount, host, "from", "to")
+	assert(count(host._socketChangedCallbacks) == 0, "Direct subscriptions used the global stream")
+	assert(count(host._socketCallbacksByName) == 2, "Missing direct subscriptions")
 	disconnectMount()
 	disconnectMount()
 	mount:deconstruct()
 	mount:deconstruct()
-	assert(count(host._socketChangedCallbacks) == 2, "Mount destroyed caller-owned watchers")
-	assert(count(from._socketChangedCallbacks) == 0, "Owner leaked source subscription")
-	assert(count(to._socketChangedCallbacks) == 0, "Owner leaked target subscription")
-	from:deconstruct()
-	to:deconstruct()
-	assert(count(host._socketChangedCallbacks) == 0, "Watcher leaked host subscription")
+	assert(count(host._socketCallbacksByName) == 0, "Direct subscription buckets leaked")
 end
 host:deconstruct()
-print(
-	"PASS: explicit attachment mounts, stable constraint/parenting, owner-driven watcher updates, guards and lifecycle (20 cycles)"
-)
+print("PASS: explicit mounts, direct subscriptions, source contracts and lifecycle (20 cycles)")

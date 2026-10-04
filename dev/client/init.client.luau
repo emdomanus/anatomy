@@ -8,7 +8,7 @@ local Workspace = game:GetService("Workspace")
 local Anatomy =
 	require(ReplicatedStorage:WaitForChild("packages"):WaitForChild("anatomy"):WaitForChild("src"))
 local runContractTests = require(script.contractTests)
-local bindMountWatchers = require(script.bindMountWatchers)
+local bindMountSockets = require(script.bindMountSockets)
 local AnatomyDevTypes = require(game.ReplicatedStorage.anatomyDevTypes.shared.anatomyDev)
 
 local DEV_ROOT_NAME = "AnatomyDev"
@@ -667,11 +667,9 @@ local function testHostReactiveSocketsAndMounts(): ()
 	host:push(rigA, 0)
 	host:push(weaponA, 10)
 
-	local rightGripWatcher = host:watchSocket("rightGrip")
-	local weaponGripWatcher = host:watchSocket("weaponGrip")
-
 	local socketChangeCount = 0
-	local disconnectSocketChanged = rightGripWatcher:bindSocketChanged(
+	local disconnectSocketChanged = host:bindToSocket(
+		"rightGrip",
 		function(_socket: Anatomy.AnatomySocket<string>?)
 			socketChangeCount += 1
 		end,
@@ -719,15 +717,15 @@ local function testHostReactiveSocketsAndMounts(): ()
 		name = "ReactiveWeaponMount",
 		parent = devRoot :: Instance,
 	})
-	local disconnectMount = bindMountWatchers(mount, weaponGripWatcher, rightGripWatcher)
+	local disconnectMount = bindMountSockets(mount, host, "weaponGrip", "rightGrip")
 
 	expect(
-		assert(rightGripWatcher:getSocket(), "Expected right grip socket"):getAttachment()
+		assert(host:getSocket("rightGrip"), "Expected right grip socket"):getAttachment()
 			== getSocketAttachment(rigA, "rightGrip"),
 		"Host should expose rig A rightGrip"
 	)
 	expect(
-		assert(weaponGripWatcher:getSocket(), "Expected weapon grip socket"):getAttachment()
+		assert(host:getSocket("weaponGrip"), "Expected weapon grip socket"):getAttachment()
 			== getSocketAttachment(weaponA, "weaponGrip"),
 		"Host should expose weapon A grip"
 	)
@@ -771,7 +769,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 	)
 	host:push(weaponB, 10)
 	expect(
-		assert(weaponGripWatcher:getSocket(), "Expected weapon grip socket"):getAttachment()
+		assert(host:getSocket("weaponGrip"), "Expected weapon grip socket"):getAttachment()
 			== getSocketAttachment(weaponB, "weaponGrip"),
 		"Weapon watcher should follow weapon layer swap"
 	)
@@ -809,7 +807,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 	)
 	host:push(rigB, 0)
 	expect(
-		assert(rightGripWatcher:getSocket(), "Expected right grip socket"):getAttachment()
+		assert(host:getSocket("rightGrip"), "Expected right grip socket"):getAttachment()
 			== getSocketAttachment(rigB, "rightGrip"),
 		"Rig watcher should follow rig layer swap"
 	)
@@ -833,8 +831,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 	disconnectSocketChanged()
 	disconnectBodyTags()
 	disconnectTrailTags()
-	rightGripWatcher:deconstruct()
-	weaponGripWatcher:deconstruct()
+
 	host:deconstruct()
 	rigA:deconstruct()
 	rigB:deconstruct()
@@ -1002,12 +999,10 @@ local function runStressBenchmark(count: number): ()
 		host:push(rigInstances[1], 0)
 		host:push(weaponInstances[1], 10)
 
-		local weaponGripWatcher = host:watchSocket("weaponGrip")
-		local rightGripWatcher = host:watchSocket("rightGrip")
 		local mount = host:mount(nil, nil, {
 			parent = benchmarkFolder :: Instance,
 		})
-		local disconnectMount = bindMountWatchers(mount, weaponGripWatcher, rightGripWatcher)
+		local disconnectMount = bindMountSockets(mount, host, "weaponGrip", "rightGrip")
 
 		local currentRig = rigInstances[1]
 		local currentWeapon = weaponInstances[1]
@@ -1042,8 +1037,6 @@ end
 
 local demoState: DemoState = {
 	reactiveMountDisconnect = nil,
-	weaponWatcher = nil,
-	rigWatcher = nil,
 	host = nil,
 	reactiveMount = nil,
 	directMount = nil,
@@ -1101,8 +1094,7 @@ local function setupDemo(): ()
 		tagGuard = guardName,
 	})
 	demoState.host = host
-	demoState.weaponWatcher = host:watchSocket("weaponGrip")
-	demoState.rigWatcher = host:watchSocket("rightGrip")
+
 	demoState.rigInstances = {
 		makeInstance(
 			"rig",
@@ -1142,11 +1134,7 @@ local function setupDemo(): ()
 		parent = devRoot :: Instance,
 	})
 	demoState.reactiveMount = mount
-	demoState.reactiveMountDisconnect = bindMountWatchers(
-		mount,
-		assert(demoState.weaponWatcher, "Demo weapon watcher is missing"),
-		assert(demoState.rigWatcher, "Demo rig watcher is missing")
-	)
+	demoState.reactiveMountDisconnect = bindMountSockets(mount, host, "weaponGrip", "rightGrip")
 
 	appendLog("Interactive demo ready. Swap rig or weapon to watch the reactive mount retarget.")
 end
@@ -1200,11 +1188,7 @@ local function rebuildReactiveDemoMount(): ()
 		parent = devRoot :: Instance,
 	})
 	demoState.reactiveMount = mount
-	demoState.reactiveMountDisconnect = bindMountWatchers(
-		mount,
-		assert(demoState.weaponWatcher, "Demo weapon watcher is missing"),
-		assert(demoState.rigWatcher, "Demo rig watcher is missing")
-	)
+	demoState.reactiveMountDisconnect = bindMountSockets(mount, host, "weaponGrip", "rightGrip")
 	appendLog("Reactive demo mount rebuilt.")
 end
 

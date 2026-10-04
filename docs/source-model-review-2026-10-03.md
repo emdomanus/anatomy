@@ -1,5 +1,7 @@
 # Source-model checkpoint — 2026-10-03
 
+Historical checkpoint: the watcher and unordered-tag API below is superseded by [direct subscriptions](./direct-subscriptions-review-2026-10-04.md).
+
 Non-YouTrack task in `C:/Users/edwar/Documents/RobloxProjects/anatomy`, branch `main`.
 The accepted performance checkpoint was committed first as `73d3b5d` (following API
 checkpoint `3738a5a`). This source-model continuation remains uncommitted for review.

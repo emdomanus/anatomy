@@ -6,14 +6,17 @@ local SocketTypes =
 local TaggedTypes = require(
 	script.Parent.Parent.Parent.Parent.components.anatomyTaggedElement.shared.anatomyTaggedElement
 )
-local WatcherTypes =
-	require(script.Parent.Parent.Parent.Parent.components.socketWatcher.shared.socketWatcher)
 local MountTypes =
 	require(script.Parent.Parent.Parent.Parent.components.socketMount.shared.socketMount)
 local AnatomyTypes = require(script.Parent.Parent.Parent.Parent.def.anatomy.shared.anatomy)
 export type AnatomySource<SocketT, TagT> = SourceTypes.AnatomySource<SocketT, TagT>
 type Socket<SocketT> = SocketTypes.AnatomySocket<SocketT>
 type Element<TagT> = TaggedTypes.AnatomyTaggedElement<TagT>
+export type TaggedSelection<SocketT, TagT> = {
+	current: Element<TagT>?,
+	callbacks: { [SourceTypes.TaggedChangedCallback<TagT>]: true },
+	disconnects: { [AnatomySource<SocketT, TagT>]: () -> () },
+}
 export type AnatomyHostOptions<SocketT, TagT> = {
 	read socketNameGuard: AnatomyTypes.NameGuard<SocketT>,
 	read tagGuard: AnatomyTypes.NameGuard<TagT>,
@@ -44,10 +47,6 @@ export type AnatomyHost<SocketT, TagT> = AnatomySource<SocketT, TagT> & {
 		priority: number
 	) -> (),
 	read clear: (self: AnatomyHost<SocketT, TagT>) -> (),
-	read watchSocket: (
-		self: AnatomyHost<SocketT, TagT>,
-		name: SocketT
-	) -> WatcherTypes.SocketWatcher<SocketT>,
 	read mount: (
 		self: AnatomyHost<SocketT, TagT>,
 		from: Attachment?,
@@ -66,10 +65,12 @@ export type AnatomyHostImpl<SocketT, TagT> = AnatomyHost<SocketT, TagT> & {
 	_socketChangedCallbacks: { [(SocketT, Socket<SocketT>?) -> ()]: true },
 	_taggedAddedCallbacks: { [SourceTypes.TaggedCallback<TagT>]: true },
 	_taggedRemovedCallbacks: { [SourceTypes.TaggedCallback<TagT>]: true },
-	_socketWatchers: { [WatcherTypes.SocketWatcher<SocketT>]: true },
+	_socketCallbacksByName: { [SocketT]: { [(Socket<SocketT>?) -> ()]: true } },
+	_taggedSelections: { [string]: TaggedSelection<SocketT, TagT> },
 	_socketMounts: { [MountTypes.SocketMount]: true },
 	_nextOrdinal: number,
 	_destroyed: boolean,
+	_refreshTopTagged: (self: AnatomyHostImpl<SocketT, TagT>, prefix: string) -> (),
 	_refreshSocket: (self: AnatomyHostImpl<SocketT, TagT>, name: SocketT) -> (),
 }
 return {}

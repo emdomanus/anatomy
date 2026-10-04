@@ -10,8 +10,6 @@ export type TestDefinition = {
 }
 export type DemoState = {
 	reactiveMountDisconnect: (() -> ())?,
-	weaponWatcher: Anatomy.SocketWatcher<string>?,
-	rigWatcher: Anatomy.SocketWatcher<string>?,
 	host: Anatomy.AnatomyHost<string, string>?,
 	reactiveMount: Anatomy.SocketMount?,
 	directMount: Anatomy.SocketMount?,

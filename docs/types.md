@@ -10,14 +10,18 @@ is implemented directly by instances and hosts, with no view wrapper:
 
 ```luau
 source:getSocket(name)
-source:getTagged(prefix)
+source:getTagged(prefix) -- independent array, lowest to highest precedence
+source:getTopTagged(prefix) -- optional element; no result-array allocation
+source:bindToSocket(name, function(socketOrNil) end, runInitially)
+source:bindTopTaggedChanged(prefix, function(elementOrNil) end, runInitially)
 source:bindSocketChanged(function(name, socketOrNil) end, runInitially)
 source:bindTaggedAdded(function(element) end, runInitially)
 source:bindTaggedRemoved(function(element) end)
 ```
 
 Each binding returns a disconnect function. Source-wide socket events include names; source tag
-events cover all elements. Initial delivery is synchronous and emits existing membership only.
+events cover all elements. Initial delivery is synchronous. Source-wide events enumerate existing membership; named socket and
+top-tag subscriptions deliver exactly one initial value, including nil.
 An instance's membership is fixed; a host's membership follows its registered sources.
 Providers must publish complete initial membership, emit actual changes, and release listeners on
 disconnect. Subscription methods that throw must clean up any listener they installed.
@@ -34,14 +38,18 @@ host:push(source, priority?) -- one registration per source identity; no result 
 host:remove(source) -- boolean; idempotent
 host:setPriority(source, priority) -- registered sources only
 host:clear()
-host:watchSocket(name)
 host:mount(fromAttachment, toAttachment, options?)
 host:deconstruct()
 ```
 
 Registrations strongly retain borrowed sources. Higher priority wins; later insertion wins ties.
 A child host contributes its resolved output as a group. Tag union membership is deduplicated by
-element identity, independent of priority; returned host tag arrays have unspecified order.
+element identity, independent of priority. Arrays are ordered from lowest to highest precedence;
+shared elements occur once at their highest-precedence position. A host first ranks its immediate
+sources by priority and insertion order, then uses each source's own ordering. Child priorities are
+local to that child, not flattened into parent priorities. `getTopTagged` agrees with the last result.
+Instances use recognition order; their top match is the last match. Custom sources must preserve this
+agreement and publish top-tag changes for membership or ordering changes, even without add/remove events.
 No layer IDs, layer objects, selector records, override modes, or name-list methods are public.
 
 ## AnatomyTemplate and AnatomyInstance
@@ -71,11 +79,14 @@ A tagged element exposes `getInstance`, `getTags`, `hasTag`, and `getLeafUnder`.
 Retired elements report no tag membership; their engine-instance access must not be used.
 Only their owning anatomy instance holds child teardown authority.
 
-## SocketWatcher and SocketMount
+## Direct observation and SocketMount
 
-`host:watchSocket(name)` returns a SocketWatcher with `getName`, `getSocket`,
-`bindSocketChanged(callback, runInitially?)`, and `deconstruct`. Its callback receives a
-socket or nil; the source-level event instead receives name plus socket. No selector is retained.
+There is no watcher constructor, type or lifetime. `bindToSocket` uses one callback bucket per observed
+name; `bindTopTaggedChanged` shares a selection and nested subscriptions per observed prefix. Both
+release their bucket/state on the last disconnect and reject subscribing to a destroyed host.
+Initial nil is observable. Changes notify only when the selected identity differs, including fallback
+and final removal. Host teardown removes membership before destroying its owned mounts.
+Static instances have no listener storage: their membership remains fixed until owner teardown.
 
 `socketMount.new(from: Attachment?, to: Attachment?, options?)` owns one RigidConstraint.
 Its public methods are `getName`, `getFromAttachment`, `getToAttachment`, `getConstraint`,
@@ -83,6 +94,6 @@ Its public methods are `getName`, `getFromAttachment`, `getToAttachment`, `getCo
 Mount options contain `name?`, `rigidName?`, `parent?`, `enabled?`.
 Omitted parent is nil, missing attachments disable the constraint, and attachment updates preserve
 requested enabled state and explicit parenting. `isConnected` does not test engine ancestry or physics.
-External owners control watcher wiring and visual-parenting policy.
+External owners control subscription wiring and visual-parenting policy.
 
-See [migration details](./source-model-review-2026-10-03.md).
+See [direct-subscription migration details](./direct-subscriptions-review-2026-10-04.md).

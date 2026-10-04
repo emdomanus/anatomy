@@ -77,8 +77,9 @@ reveals the next candidate. A nested host resolves internally and contributes it
 registration priority. Direct and indirect host cycles are rejected.
 
 Tags form an identity-deduplicated union, with reference counts for shared contributions through
-multiple child hosts. Priority affects sockets, not tag membership. Host tag-result order is unspecified;
-callers must not interpret first/last position as priority. Instance results follow recognized element order.
+multiple child hosts. Priority does not filter tag membership. Host tag results run from lowest to highest precedence,
+with shared elements placed at their highest-precedence occurrence. Instance results follow recognized
+element order; `getTopTagged(prefix)` selects the last matching element in the winning source.
 
 ## Tags
 
@@ -95,21 +96,33 @@ end
 ```
 
 Collection queries return independent arrays. There are no public descriptor getters, socket-name
-lists, bulk socket maps, traversal helpers, or first/last tag shortcuts.
+lists, bulk socket maps, or traversal helpers. `getTopTagged(prefix)` resolves one element without
+allocating a result array; it returns nil when nothing matches.
 
-## Watchers and mounts
+## Direct subscriptions and mounts
 
 ```luau
-local watcher = host:watchSocket("rightGrip")
 local mount = host:mount(nil, weaponAttachment, { parent = constraintOwner })
-local disconnect = watcher:bindSocketChanged(function(socket)
+local disconnect = host:bindToSocket("rightGrip", function(socket)
     mount:setAttachments(if socket then socket:getAttachment() else nil, weaponAttachment)
+end, true)
+
+local releaseTagged = host:bindTopTaggedChanged("weapon.blade", function(element)
+    -- Update the presentation target, or clear it when element is nil.
 end, true)
 ```
 
-A watcher follows one resolved name and exposes `getName`, `getSocket`, `bindSocketChanged`, and
-`deconstruct`. Its callback receives the socket or nil, unlike the source-wide name/socket stream.
-A concrete socket always has an attachment; its owner retires it rather than turning it into an empty socket.
+Named socket subscriptions receive the socket or nil directly; there is no SocketWatcher object.
+Top-tag subscriptions receive the selected tagged element or nil. Initial delivery includes nil.
+Each binding returns an idempotent disconnect function. Callbacks are installed before initial delivery;
+a throwing initial callback releases its subscription before propagating the error.
+
+One named socket callback bucket is shared by its listeners. Top-tag selection state is created only
+for an observed prefix and shared across its listeners. Nested source subscriptions are installed on
+the first listener and released with the last. Unobserved queries resolve on demand; observed queries
+read the cached winner. Only affected observed prefixes are reconciled on mutation, and notification
+requires an identity change. Winner removal resolves fallback candidates; it does not rebuild all tags.
+A concrete socket always has an attachment until its owner retires it.
 
 Mounts accept `Attachment?` values only. `Anatomy.socketMount.new(from, to, options?)` and
 `host:mount(from, to, options?)` eagerly own one reusable RigidConstraint. Options are
@@ -121,10 +134,11 @@ Mounts do not subscribe to sources or parent rendered models; their owner handle
 
 ## Ownership
 
-Remove a source from every parent host before destroying it. Removing a source only disconnects its
-registration; it never destroys that source. Hosts do not observe arbitrary source destruction.
+Remove static instances and custom sources from every parent before destroying them. Removing a
+source only disconnects its registration; it never destroys that source. A host publishes its membership
+removal during teardown, so a parent can fall back; it does not infer arbitrary provider destruction.
 Disconnect external mount-updating callbacks before destroying mounts or their host. Host teardown
-releases its watchers, mounts, and child subscriptions, while leaving borrowed sources alive.
+releases its named/prefix listeners, mounts, and child subscriptions, while leaving borrowed sources alive.
 Remove instances from hosts and clear/destroy mounts referencing their attachments before instance teardown.
 `instantiate` owns its cloned root; `wrap` borrows its root.
 

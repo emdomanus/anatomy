@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Replace SocketWatcher with direct `bindToSocket` subscriptions and shared per-name callback buckets.
+- Add allocation-free single-result `getTopTagged` and lazy `bindTopTaggedChanged` observation.
+- Order host tagged queries by source priority, registration order and source-local element order;
+  deduplicate shared leaves at their highest-precedence occurrence and propagate nested priority changes.
+- Publish host membership removal during teardown before disposing its explicit mounts.
+
 ## 0.2.0
 
 - Removed the surface API and surface descriptors.

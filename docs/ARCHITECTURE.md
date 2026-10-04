@@ -18,7 +18,7 @@ return independent arrays and never expose mutable internal registries.
 ## AnatomySource composition
 
 Instances and hosts directly satisfy the source port: socket lookup, prefix-tag query, source-wide
-socket changes, tag additions, and tag removals. Synchronous initial subscription delivery supplies
+socket changes, tag additions/removals, and direct named socket/top-tag subscriptions. Synchronous initial subscription delivery supplies
 actual membership without public enumeration methods. Static instances have no change-listener
 storage; their owner must detach them from all parents before destruction.
 
@@ -45,26 +45,34 @@ No collection of every socket name or full-prefix refresh is performed.
 
 Tag changes update an element-identity reference count. The first contribution emits added;
 the last contribution emits removed. Shared leaves through multiple child hosts are deduplicated.
-Host `getTagged(prefix)` filters the current union and returns an independent array; its cost is
-linear in current union membership. Results are unordered and are unaffected by whether listeners
-exist. Priority affects sockets, not tags.
+Host `getTagged(prefix)` queries sources in precedence order and returns an independent, ordered,
+identity-deduplicated array. Shared elements occupy their highest-precedence occurrence. Child ordering
+remains local to each child; parent priority ranks child groups. `getTopTagged` returns the last match
+from the highest-ranked nonempty source without constructing arrays.
+
+Top-tag selection caches exist only for observed prefixes. The first listener subscribes to that prefix
+on child sources; later listeners share the cache and subscriptions. Membership/priority mutations
+reconcile affected observed prefixes, and nested priority-only changes propagate through the same
+prefix stream. Identity equality suppresses redundant callbacks. Last disconnect releases the child
+subscriptions and cache. Unobserved getters scan on demand; observed getters return the cache.
+There is no eager index or retained candidate list for every possible tag prefix.
 
 Mutation commits registration/tag state before notification. Publication checks the current state
 between callbacks so reentrant removal or replacement does not continue emitting stale selections.
 Removal detaches subscriptions before reconciling output. `clear` snapshots source identities so
 new registrations created by callbacks are not accidentally swept into the same clear operation.
 
-## Watchers, mounts, and teardown
+## Direct subscriptions, mounts, and teardown
 
-A SocketWatcher filters the source socket stream by one name and has one socket-change callback set.
-It does not own its selected socket. An AnatomySocket always has an Attachment until retired.
-SocketMount owns one reusable RigidConstraint with explicit attachments, enabled intent, and parent.
-It does not know about sources or watchers. Rendering owners subscribe externally and update it.
+`bindToSocket(name, callback, runInitially)` registers directly in a shared per-name callback bucket.
+The host retains the source-wide socket stream for composition; consumers need no forwarding object.
+An AnatomySocket always has an Attachment until retired. SocketMount owns one reusable RigidConstraint
+with explicit attachments, enabled intent, and parent. Rendering owners bind externally and update it.
 
-Remove sources from all parents before their final teardown; source deconstruction is not an
-observable membership operation. Remove instances from hosts and clear/destroy their attachment
-mounts before retiring their sockets. Disconnect owner callbacks before mount/host teardown.
-Host teardown releases its watchers/mounts and all child subscriptions but never destroys sources.
+Remove static/custom sources from their parents before final teardown. Host teardown publishes source
+removals and nil/fallback selections before destroying owned mounts, then clears subscriptions. It never
+destroys borrowed sources. Release mount-update callbacks before manually destroying a mount. A static
+instance's subscription returns a no-op release because its membership cannot change while alive.
 
 ## Allocation tradeoff
 
@@ -75,6 +83,13 @@ Push/remove currently use a temporary tag-notification list to finish membership
 calling observers. Priority changes and individual source socket/tag events allocate no explicit
 Luau tables in Anatomy. Consumer callbacks, closures, engine allocations, and array capacity growth
 are separate costs; this is source accounting, not a profiler claim.
+
+A named socket bucket costs one table per observed name, shared by all listeners, instead of two
+watcher tables per consumer. A top-tag observation costs three tables per host/prefix (selection,
+callbacks, child releases), shared by all listeners; subscribing through nested hosts activates the
+same prefix there. Each host has two empty maps holding these lazy entries. Last release removes an
+entry. Discrete top-tag queries allocate no explicit tables. Bulk queries still allocate result arrays,
+a deduplication set per host query, and source query arrays; they are not allocation-free.
 
 ## Verification
 
