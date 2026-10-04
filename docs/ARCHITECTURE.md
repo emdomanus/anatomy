@@ -1,166 +1,86 @@
-# Anatomy Architecture
+# Architecture
 
-Anatomy turns a Roblox model into a queryable registry of named sockets and
-hierarchical tags. A host can aggregate several anatomy instances as
-layers, resolve sockets and tags across those layers, and build reactive
-socket-to-socket mounts.
+Anatomy owns visual asset recognition, concrete socket/tagged-element identity, composition,
+and explicit attachment constraints. Game-specific policy and rendering ownership remain in consumers.
 
-The package is engine-generic: it knows about `Instance`, `Attachment`, names,
-tags, and paths. It does not know about characters, weapons, VFX, gameplay state,
-or replication.
+## Asset and runtime ownership
 
-## Lifecycle
+`anatomyTemplate.new(asset, options)` scans the root and one descendant array, builds paths,
+and freezes the descriptors it owns. Paths are reversed in place. The template retains one frozen
+construction record reused by `instantiate` and `wrap`; descriptor shapes are not a public input.
+An instantiated model is cloned and owned; a wrapped model is borrowed. Both resolve the captured
+paths into concrete sockets and tagged elements. Attributes are not watched after recognition.
 
-```text
-Template  --recognize/crawl once-->  descriptors
-   | instantiate() / wrap()
-   v
-Instance  --resolve paths-->  sockets, tagged elements
-   | host:push()
-   v
-Host      --layer aggregate--> sockets, tag queries, watchers, mounts
-```
+Tags are immutable per-element membership. `getTags` returns the frozen set directly, shared across
+instances of the template. Retired elements return a shared frozen empty set. Collection queries
+return independent arrays and never expose mutable internal registries.
 
-## Template
+## AnatomySource composition
 
-`AnatomyTemplate.recognize(root, config)` walks `root` and its descendants once.
-It records structural paths from the root instead of live references.
+Instances and hosts directly satisfy the source port: socket lookup, prefix-tag query, source-wide
+socket changes, tag additions, and tag removals. Synchronous initial subscription delivery supplies
+actual membership without public enumeration methods. Static instances have no change-listener
+storage; their owner must detach them from all parents before destruction.
 
-The crawl records:
+A host registers sources by table identity. Registrations are private records containing priority,
+registration order, cached socket/tag contributions, and three disconnect functions. The source
+key is retained strongly. There are no public layer objects, registration IDs, override switches,
+or allocated source wrappers. A source can occur only once within one host and in multiple hosts.
 
-- `SocketDescriptor<SocketT>` from `socketAttribute`; sockets must be on
-  `Attachment` instances, are guarded by `socketNameGuard`, and must be unique in
-  one template.
-- `TagDescriptor<TagT>` from `tagsAttribute`; each authored tag path is split by
-  `tagDelimiter`, trimmed, validated by required `tagGuard`, and expanded into
-  query prefixes using `tagPathDelimiter`.
+Highest priority supplies the resolved socket; later registration wins ties. Nested hosts resolve
+internally, then contribute their result at the parent's priority. An identity-only weak host graph
+borrows each host's existing source array to reject direct and indirect cycles without adding a
+second child collection or widening the public port. Custom providers must not hide cyclic composition.
 
-Templates snapshot and freeze their configuration and descriptor data. Arbitrary nested metadata values and the live source Instance remain caller-owned. `instantiate(parent)` clones the source
-model and binds the clone. `wrap(root)` binds an existing model without cloning.
+## Incremental updates
 
-## Instance
+Initial source subscription stages and validates membership before installing the registration.
+Failure releases all acquired subscriptions and publishes no partial registration. No per-socket
+entry object is allocated: each registration stores a name-to-socket map.
 
-The private instance constructor receives a public template and explicit construction options, and resolves descriptor paths against
-the concrete root with `Path.resolve`.
+A child socket event updates its cached contribution and resolves that name against ordered
+registrations only. Insertion, removal, and reprioritization reconsider only names supplied by
+that registration. The host publishes a socket change only when its selected identity changes.
+No collection of every socket name or full-prefix refresh is performed.
 
-It builds and owns:
+Tag changes update an element-identity reference count. The first contribution emits added;
+the last contribution emits removed. Shared leaves through multiple child hosts are deduplicated.
+Host `getTagged(prefix)` filters the current union and returns an independent array; its cost is
+linear in current union membership. Results are unordered and are unaffected by whether listeners
+exist. Priority affects sockets, not tags.
 
-- `AnatomySocket<SocketT>`
-- `AnatomyTaggedElement<TagT>`
+Mutation commits registration/tag state before notification. Publication checks the current state
+between callbacks so reentrant removal or replacement does not continue emitting stale selections.
+Removal detaches subscriptions before reconciling output. `clear` snapshots source identities so
+new registrations created by callbacks are not accidentally swept into the same clear operation.
 
-Tagged elements are indexed by prefix in `_tagPrefixIndex`, so
-`instance:getByTag(prefix)` is a direct prefix lookup. Named element lookup should
-be modeled as tags, for example `part.torso` or `weapon.blade`.
+## Watchers, mounts, and teardown
 
-## Host
+A SocketWatcher filters the source socket stream by one name and has one socket-change callback set.
+It does not own its selected socket. An AnatomySocket always has an Attachment until retired.
+SocketMount owns one reusable RigidConstraint with explicit attachments, enabled intent, and parent.
+It does not know about sources or watchers. Rendering owners subscribe externally and update it.
 
-`AnatomyHost` stores layers in priority order. It does not own pushed anatomy
-instances; callers own instance lifetime.
+Remove sources from all parents before their final teardown; source deconstruction is not an
+observable membership operation. Remove instances from hosts and clear/destroy their attachment
+mounts before retiring their sockets. Disconnect owner callbacks before mount/host teardown.
+Host teardown releases its watchers/mounts and all child subscriptions but never destroys sources.
 
-Socket resolution walks layers in order. The first socket wins unless later
-layers are allowed to override sockets. Socket APIs include:
+## Allocation tradeoff
 
-- `getSocket(name, layerId?, includeOverrides?)`
-- `getSockets(layerId?, includeOverrides?)`
-- `getSocketNames(layerId?, includeOverrides?)`
-- `bindSocket(name, callback, runInitially?, layerId?, includeOverrides?)`
-- `watchSocket(name, layerId?, includeOverrides?)`
-
-Tag queries collect matching tagged elements across layers:
-
-- `getByTag(prefix, layerId?)`
-- `bindByTag(prefix, onAdded, onRemoved, runInitially?)`
-
-Watched tag prefixes are materialized in `_resolvedByPrefix` and refreshed when
-layers are pushed, removed, or reprioritized.
-
-## Sockets, watchers, and mounts
-
-An `AnatomySocket` identifies one concrete attachment. `getAttachment()` returns `Attachment`;
-there is no attachment-change subscription or separate endpoint protocol.
-
-`host:watchSocket(name, layerId?, includeOverrides?)` returns a caller-owned `SocketWatcher`.
-It tracks a host address and publishes the selected `AnatomySocket` or `nil` through
-`bindSocketChanged(callback, runInitially?)`. Its internal constructor receives the host directly
-through `SocketSubscription`; no source adapter or query snapshot is allocated. The host stores
-scalar selector fields in its subscription record. A watcher has one callback set.
-
-`host:mount(from, to, options?)` and `Anatomy.socketMount.new(from, to, options?)` accept
-`Attachment?` for both sides. A mount eagerly owns exactly one `RigidConstraint`, including
-when constructed empty. There are no socket/watcher imports, input unions, subscriptions,
-retargeting callbacks, retained query/options records, or lazy constraint state inside it.
-
-Callers use `setAttachments(from, to)`, `setEnabled(enabled)`, and `setParent(parent)`.
-A missing attachment disables the constraint; restoring both respects the requested enabled
-state. The parent is supplied explicitly at construction or through `setParent`; attachment
-updates never infer or restore a parent. The constraint is reused until idempotent teardown.
-`isConnected()` describes configured state, not physical activity or ancestry.
-
-Rendering owners may observe watchers, read each selected socket's attachment, update the mount,
-and hide/unparent their model as appropriate. They own the disconnect functions and release them
-before destroying the mount/host. `dev/client/bindMountWatchers.luau` demonstrates this external
-wiring and is exercised by the contract suite; it is not a published reactive-mount abstraction.
-
-## Ownership
-
-- Callers own templates, instances, hosts, and returned watchers/mounts.
-- Instances own their sockets and tagged elements; consumers receive borrowed views.
-- Hosts own layer registrations and track outstanding watchers/host-created mounts for teardown.
-- Mounts borrow attachments and own their constraint. Callers own watcher subscriptions;
-  mount destruction has no effect on watchers or subscriptions.
-- Watcher destruction disconnects from the host and clears a selected socket to `nil` for listeners.
-
-Remove an instance from every host before deconstructing it. Clear or destroy mounts using its
-attachments before deconstructing it. Release caller-owned subscriptions before mount/host teardown. Those rules ensure watchers publish removal while sockets remain
-valid. A retired socket rejects attachment access; it does not become an empty socket. Host teardown
-does not destroy the instances it layers. External engine destruction and streaming are not observed.
-
-## Notes
-
-- Tags are parsed at template-recognition time and are not re-parsed at runtime.
-- `tagGuard` is consumer-injected; the package has no hardcoded tag vocabulary.
-- Named part descriptors were removed; use tags for semantic or named element
-  lookup.
-- Surface APIs were removed in `0.2.0`; authoring that previously used surfaces
-  should move to hierarchical tags.
-
-## Contract ownership
-
-Runtime leaves and mirrored object type owners live under explicit `shared` domains.
-The package entrypoint selects exact canonical leaves; category-level forwarding barrels
-have been removed. `types/ports` holds actual independently consumed capabilities.
-Contracts depend on contracts/definitions, never runtime implementations.
-
-The host owns layer ordering and refresh. Layer handles retain `AnatomyHostLayerCommands`
-plus an immutable registration ordinal, not the host implementation. Socket and tagged-element
-objects do not retain recursive parent implementation types. Instances hold child `Owned`
-views and expose borrowed public views.
+The previous recognition/instance improvements are preserved. Frozen tags remove per-read cloning.
+Source registration now retains one record and two contribution maps, plus disconnect closures;
+this retained state allows incremental updates and nesting. There is no options table at push.
+Push/remove currently use a temporary tag-notification list to finish membership changes before
+calling observers. Priority changes and individual source socket/tag events allocate no explicit
+Luau tables in Anatomy. Consumer callbacks, closures, engine allocations, and array capacity growth
+are separate costs; this is source accounting, not a profiler claim.
 
 ## Verification
 
-`pwsh -NoProfile -File scripts/verify/run.ps1 -Check tests` runs actual package modules
-in Lune with Roblox datatype support, without writing generated source. Its constraint sink
-is simulated because Lune 0.10.5 cannot clear reflected attachment references to nil.
-It covers guard rejection, inferred-constructor callers, prefix queries, descriptor snapshots,
-stale handles, socket selection/removal, explicit constraint updates, stable parenting,
-requested enabled state, and cleanup of externally wired watcher subscriptions.
-The Studio harness retains its six original assertion groups and adds these contract cases.
-Studio physics, UI, and real constraint lifecycle still require explicit Studio verification.
-
-## Allocation behavior
-
-Recognition performs one descendant scan, reverses each path in place, and freezes its owned
-records without copying them a second time. The public template constructor continues to
-snapshot caller-owned descriptors. Each template retains one frozen construction record;
-`wrap` and `instantiate` reuse it without descriptor-map/array copies.
-
-Instance/tag traversal methods let hosts validate registrations and collect names/tags directly
-into their destination tables. Public snapshot getters remain independent. Refresh still creates
-fresh name/tag sets so nested callbacks do not overwrite shared scratch; there is no pooling.
-The two weak-key registries share one frozen metatable without changing their ownership behavior.
-`getFirstByTag` and `getLastByTag` avoid result arrays while preserving selection at
-the corresponding end of the existing collection.
-
-See [allocation accounting and integration entrypoints](./allocation-review-2026-10-03.md).
-The contract suite also covers root tags, duplicate sibling ordinals, repeated construction,
-public snapshot isolation, nested host refresh, and duplicate layer tag membership.
+The guarded runner covers formatting, lint, full new-solver analysis, behavioral tests, package/dev
+Rojo builds, and docs. Source tests exercise real instance/host callers for constructor inference,
+frozen tags, duplicate-name paths, identity registration, priority ties, nested propagation, cycles,
+shared tag contributions, rollback, reentrant removal, borrowed lifetime, and incremental event scope.
+The existing explicit-mount contract tests remain. The Studio demo and six behavioral groups use
+the new API. Headless constraints are simulated property sinks; Studio verification is pending.

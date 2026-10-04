@@ -26,7 +26,6 @@ type AnatomyInstanceOptions<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstanc
 type AnatomySocketOwned<SocketT> = AnatomySocketTypes.AnatomySocketOwned<SocketT>
 
 type AnatomyCategory = AnatomyInstanceTypes.AnatomyCategory
-type AnatomyId = AnatomyInstanceTypes.AnatomyId
 type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
 type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
 	AnatomyTemplate<SocketT, TagT>,
@@ -84,7 +83,6 @@ function AnatomyInstance.new<SocketT, TagT>(
 
 	self._template = template
 	self._root = root
-	self._id = template:getId()
 	self._category = template:getCategory()
 	self._metadata = template:getMetadata()
 	self._ownsRoot = ownsRoot == true
@@ -112,10 +110,6 @@ function AnatomyInstance.new<SocketT, TagT>(
 	return self
 end
 
-function AnatomyInstance.getId<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): AnatomyId?
-	return self._id
-end
-
 function AnatomyInstance.getCategory<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>): AnatomyCategory?
 	return self._category
 end
@@ -141,71 +135,7 @@ function AnatomyInstance.getSocket<SocketT, TagT>(
 	return self._sockets[name]
 end
 
-function AnatomyInstance.forEachSocket<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>,
-	callback: (SocketT, AnatomySocket<SocketT>) -> ()
-): ()
-	for name, socket in self._sockets do
-		callback(name, socket)
-	end
-end
-
-function AnatomyInstance.forEachTaggedElement<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>,
-	callback: (AnatomyTaggedElement<TagT>) -> ()
-): ()
-	for _, element in self._taggedElements do
-		callback(element)
-	end
-end
-
-function AnatomyInstance.forEachByTag<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>,
-	prefix: string,
-	callback: (AnatomyTaggedElement<TagT>) -> ()
-): ()
-	local elements = self._tagPrefixIndex[prefix]
-	if elements then
-		for _, element in elements do
-			callback(element)
-		end
-	end
-end
-
-function AnatomyInstance.getFirstByTag<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>,
-	prefix: string
-): AnatomyTaggedElement<TagT>?
-	local elements = self._tagPrefixIndex[prefix]
-	return if elements then elements[1] else nil
-end
-
-function AnatomyInstance.getLastByTag<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>,
-	prefix: string
-): AnatomyTaggedElement<TagT>?
-	local elements = self._tagPrefixIndex[prefix]
-	return if elements then elements[#elements] else nil
-end
-
-function AnatomyInstance.getSockets<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>
-): { [SocketT]: AnatomySocket<SocketT> }
-	-- The independent snapshot exposes borrowed children, not their owner's teardown authority.
-	return table.clone(self._sockets) :: { [SocketT]: AnatomySocket<SocketT> }
-end
-
-function AnatomyInstance.getTaggedElements<SocketT, TagT>(
-	self: AnatomyInstanceImpl<SocketT, TagT>
-): { AnatomyTaggedElement<TagT> }
-	local elements: { AnatomyTaggedElement<TagT> } = {}
-	for _, element in self._taggedElements do
-		table.insert(elements, element)
-	end
-	return elements
-end
-
-function AnatomyInstance.getByTag<SocketT, TagT>(
+function AnatomyInstance.getTagged<SocketT, TagT>(
 	self: AnatomyInstanceImpl<SocketT, TagT>,
 	prefix: string
 ): { AnatomyTaggedElement<TagT> }
@@ -219,6 +149,47 @@ function AnatomyInstance.getByTag<SocketT, TagT>(
 		table.insert(result, element)
 	end
 	return result
+end
+
+local function disconnectStatic(): () end
+
+function AnatomyInstance.bindSocketChanged<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	callback: (
+		SocketT,
+		AnatomySocket<SocketT>?
+	) -> (),
+	runInitially: boolean?
+): () -> ()
+	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyInstance")
+	if runInitially then
+		for name, socket in self._sockets do
+			callback(name, socket)
+		end
+	end
+	return disconnectStatic
+end
+
+function AnatomyInstance.bindTaggedAdded<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	callback: (AnatomyTaggedElement<TagT>) -> (),
+	runInitially: boolean?
+): () -> ()
+	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyInstance")
+	if runInitially then
+		for _, element in self._taggedElements do
+			callback(element)
+		end
+	end
+	return disconnectStatic
+end
+
+function AnatomyInstance.bindTaggedRemoved<SocketT, TagT>(
+	self: AnatomyInstanceImpl<SocketT, TagT>,
+	_callback: (AnatomyTaggedElement<TagT>) -> ()
+): () -> ()
+	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyInstance")
+	return disconnectStatic
 end
 
 function AnatomyInstance.setParent<SocketT, TagT>(self: AnatomyInstanceImpl<SocketT, TagT>, parent: Instance?): ()

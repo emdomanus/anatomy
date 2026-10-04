@@ -1,5 +1,8 @@
 # New-solver review — 2026-10-02
 
+This is a historical checkpoint. The current contract and verification are in the
+[source-model checkpoint](./source-model-review-2026-10-03.md).
+
 The socket/watcher and explicit-mount checkpoints below were accepted and committed
 as `3738a5a`. The subsequent performance work and current verification receipt are in
 [the allocation checkpoint](./allocation-review-2026-10-03.md).

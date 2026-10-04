@@ -8,8 +8,6 @@ local Guard = require(script.Parent.Parent.Parent.Parent.Parent.Parent.Parent.ro
 --------------------------------------------------------------------------------
 
 export type AnatomyCategory = string
-export type AnatomyId = string
-export type LayerId = string
 
 --------------------------------------------------------------------------------
 -- Paths
@@ -55,7 +53,6 @@ export type InstancePolicy = {
 }
 
 export type RecognizeOptions<SocketT, TagT> = {
-	read id: AnatomyId?,
 	read category: AnatomyCategory?,
 
 	read socketAttribute: string?,

@@ -1,360 +1,88 @@
-# Types
+# Public contracts
 
-Anatomy exposes Luau types from the package entrypoint so consumers can type sockets, tags, hosts, instances, and mount inputs without importing implementation modules directly.
+`src/init.luau` selects the public constructors and canonical types. Internal descriptor, registration,
+and implementation types remain package-owned.
 
-```luau
-local Anatomy = require(ReplicatedStorage.packages.anatomy)
+## AnatomySource
 
-type RecognizeOptions<SocketT, TagT> = Anatomy.RecognizeOptions<SocketT, TagT>
-type AnatomyHost<SocketT, TagT> = Anatomy.AnatomyHost<SocketT, TagT>
-type SocketWatcher<SocketT> = Anatomy.SocketWatcher<SocketT>
-type SocketMount = Anatomy.SocketMount
-```
-
-The exact public surface is re-exported from [`src/init.luau`](https://github.com/emdomanus/anatomy/blob/main/src/init.luau) and backed by canonical leaf modules under `src/anatomy/types`.
-
-## Type Index
-
-### Definitions
-
-- [`AnatomyCategory`](#anatomycategory)
-- [`AnatomyId`](#anatomyid)
-- [`LayerId`](#layerid)
-- [`AnatomyPathStep`](#anatomypathstep)
-- [`AnatomyPath`](#anatomypath)
-- [`DescriptorMetadata`](#descriptormetadata)
-- [`NameGuard`](#nameguard)
-- [`InstancePolicy`](#instancepolicy)
-
-### Recognition
-
-- [`SocketDescriptor`](#socketdescriptor)
-- [`TagDescriptor`](#tagdescriptor)
-- [`RecognizeOptions`](#recognizeoptions)
-- [`RecognizeConfig`](#recognizeconfig)
-
-### Components
-
-- [`SocketChangedCallback`](#socketchangedcallback)
-- [`AnatomySocket`](#anatomysocket)
-- [`AnatomyTaggedElement`](#anatomytaggedelement)
-- [`AnatomyTemplate`](#anatomytemplate)
-- [`AnatomyInstance`](#anatomyinstance)
-- [`SocketWatcher`](#socketwatcher)
-- [`SocketMount`](#socketmount)
-- [`SocketMountOptions`](#socketmountoptions)
-
-### Host
-
-- [`AnatomyHost`](#anatomyhost)
-- [`AnatomyHostOptions`](#anatomyhostoptions)
-- [`AnatomyHostLayer`](#anatomyhostlayer)
-- [`AnatomyHostLayerOptions`](#anatomyhostlayeroptions)
-- [`TagChangedCallback`](#tagchangedcallback)
-
-## AnatomyCategory
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-String category for grouping templates and host layers, such as `"rig"` or `"weapon"`.
-
-## AnatomyId
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-String identifier used by recognized templates and other anatomy-owned records.
-
-## LayerId
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-String identifier for a pushed host layer. Layer ids are used by socket queries and reactive mounts.
-
-## AnatomyPathStep
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-One resolved step in a structural path from a recognized root.
+The [source port](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/anatomySource/shared/anatomySource.luau)
+is implemented directly by instances and hosts, with no view wrapper:
 
 ```luau
-export type AnatomyPathStep = {
-	name: string,
-	className: string?,
-	ordinal: number?,
-}
+source:getSocket(name)
+source:getTagged(prefix)
+source:bindSocketChanged(function(name, socketOrNil) end, runInitially)
+source:bindTaggedAdded(function(element) end, runInitially)
+source:bindTaggedRemoved(function(element) end)
 ```
 
-## AnatomyPath
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-Array of [`AnatomyPathStep`](#anatomypathstep) entries used to resolve a descriptor against a cloned or wrapped instance.
-
-## DescriptorMetadata
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-Loose metadata map carried by descriptors and templates.
-
-## NameGuard
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-Identity-preserving guard for socket and tag names. It accepts `unknown`, returns
-the accepted typed value, and throws on rejection; it does not return a boolean.
-
-```luau
-export type NameGuard<TName> = Guard.GuardFn<TName> -- (unknown) -> TName; throws on rejection
-```
-
-## InstancePolicy
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-Optional part policy applied when a template instantiates a clone.
-
-## SocketDescriptor
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-Template-time socket record. It stores the socket name, structural path, and optional metadata.
-
-```luau
-export type SocketDescriptor<SocketT> = {
-	name: SocketT,
-	path: AnatomyPath,
-	metadata: DescriptorMetadata?,
-}
-```
-
-## TagDescriptor
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-Template-time tag record. It stores the tagged element path, accepted typed tags, and query prefixes.
-
-## RecognizeOptions
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-Configuration for `Anatomy.anatomyTemplate.recognize`.
-
-```luau
-export type RecognizeOptions<SocketT, TagT> = {
-	id: AnatomyId?,
-	category: AnatomyCategory?,
-
-	socketAttribute: string?,
-	tagsAttribute: string?,
-	tagDelimiter: string?,
-	tagPathDelimiter: string?,
-	socketNameGuard: NameGuard<SocketT>,
-	tagGuard: NameGuard<TagT>,
-
-	instancePolicy: InstancePolicy?,
-
-	metadata: DescriptorMetadata?,
-}
-```
-
-Both guards are required. Their typed return values infer the socket and tag generics. A guard must preserve identity and throw on invalid input; a string guard provides an unrestricted vocabulary.
-
-## RecognizeConfig
-
-Source: [`src/anatomy/types/def/anatomy/shared/anatomy.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/def/anatomy/shared/anatomy.luau)
-
-Alias of [`RecognizeOptions`](#recognizeoptions), used internally once recognition options are normalized.
-
-
-
-
-## SocketChangedCallback
-
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
-
-Callback used by host subscriptions and socket watchers when a socket resolves, retargets, or clears.
-
-## AnatomySocket
-
-Source: [`src/anatomy/types/components/anatomySocket/shared/anatomySocket.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomySocket/shared/anatomySocket.luau)
-
-Runtime socket resolved from a [`SocketDescriptor`](#socketdescriptor). `getAttachment()` returns a required `Attachment`. It has no change event; a retired socket rejects attachment access.
-
-## AnatomyTaggedElement
-
-Source: [`src/anatomy/types/components/anatomyTaggedElement/shared/anatomyTaggedElement.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyTaggedElement/shared/anatomyTaggedElement.luau)
-
-Runtime tagged element resolved from a [`TagDescriptor`](#tagdescriptor). Host and instance tag queries return these.
-
-## AnatomyTemplate
-
-Source: [`src/anatomy/types/components/anatomyTemplate/shared/anatomyTemplate.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyTemplate/shared/anatomyTemplate.luau)
-
-Recognized asset description. Templates store descriptor paths and can instantiate clones or wrap existing roots.
-
-## AnatomyInstance
-
-Source: [`src/anatomy/types/components/anatomyInstance/shared/anatomyInstance.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/anatomyInstance/shared/anatomyInstance.luau)
-
-Live clone or wrapped model resolved against an [`AnatomyTemplate`](#anatomytemplate).
-
-## SocketWatcher
-
-Source: [`src/anatomy/types/components/socketWatcher/shared/socketWatcher.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketWatcher/shared/socketWatcher.luau)
-
-Caller-owned observer returned by `host:watchSocket(name, layerId?, includeOverrides?)`.
-It has `getName()`, `getSocket(): AnatomySocket?`, `bindSocketChanged(callback, runInitially?)`,
-and idempotent `deconstruct()`. There is no public watcher constructor, attachment getter,
-or attachment-change event. Consumers read the attachment from the selected socket.
-
-## SocketMount
-
-Source: [`src/anatomy/types/components/socketMount/shared/socketMount.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketMount/shared/socketMount.luau)
-
-Owns one `RigidConstraint` with explicit `Attachment?` inputs. Construct with
-`socketMount.new(from, to, options?)` or `host:mount(from, to, options?)`.
-
-- `setAttachments(from, to)` updates both sides. Either side may be nil.
-- `setEnabled(enabled)` sets caller intent, retained across attachment changes.
-- `setParent(parent)` explicitly parents/unparents only the constraint.
-- `getFromAttachment()`, `getToAttachment()`, and `getConstraint()` inspect current state.
-- `isConnected()` reports an enabled constraint with both attachment references, not physics activity.
-- `deconstruct()` destroys the owned constraint, idempotently.
-
-Construction allocates the constraint immediately. A missing side disables it; attachment changes
-reuse it without altering its parent. There is no `refresh`, watcher subscription, polymorphic
-input, or reactive subclass. Caller-owned observation drives any retargeting or visibility behavior.
-
-## SocketMountOptions
-
-Source: [`src/anatomy/types/components/socketMount/shared/socketMount.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/components/socketMount/shared/socketMount.luau)
-
-Options for creating a [`SocketMount`](#socketmount), including the constraint name, requested enabled state, and explicit parent. An omitted
-parent leaves the constraint unparented. The mount consumes these options during construction.
+Each binding returns a disconnect function. Source-wide socket events include names; source tag
+events cover all elements. Initial delivery is synchronous and emits existing membership only.
+An instance's membership is fixed; a host's membership follows its registered sources.
+Providers must publish complete initial membership, emit actual changes, and release listeners on
+disconnect. Subscription methods that throw must clean up any listener they installed.
+Custom providers must not hide feedback cycles behind adapters; package hosts reject cycles
+through their directly registered host graph. Remove sources from parents before final teardown.
 
 ## AnatomyHost
 
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
-
-Main runtime aggregation API. It accepts anatomy instances as ordered layers, resolves sockets, resolves tag prefixes, creates watchers, and creates mounts.
+`anatomyHost.new({ socketNameGuard, tagGuard })` infers both vocabulary types from guards.
+It implements AnatomySource and adds:
 
 ```luau
-export type AnatomyHost<SocketT, TagT> = {
-	push: (
-		self: AnatomyHost<SocketT, TagT>,
-		instance: AnatomyInstance<SocketT, TagT>,
-		options: AnatomyHostLayerOptions?
-	) -> AnatomyHostLayer<SocketT, TagT>,
-
-	getSocket: (
-		self: AnatomyHost<SocketT, TagT>,
-		name: SocketT,
-		layerId: LayerId?,
-		includeOverrides: boolean?
-	) -> AnatomySocket<SocketT>?,
-
-	getByTag: (
-		self: AnatomyHost<SocketT, TagT>,
-		prefix: string,
-		layerId: LayerId?
-	) -> { AnatomyTaggedElement<TagT> },
-
-	mount: (
-		self: AnatomyHost<SocketT, TagT>,
-		from: Attachment?,
-		to: Attachment?,
-		options: SocketMountOptions?
-	) -> SocketMount,
-}
+host:push(source, priority?) -- one registration per source identity; no result handle
+host:remove(source) -- boolean; idempotent
+host:setPriority(source, priority) -- registered sources only
+host:clear()
+host:watchSocket(name)
+host:mount(fromAttachment, toAttachment, options?)
+host:deconstruct()
 ```
 
-The excerpt above is smaller than the full type. Keep the source type as the exact contract.
+Registrations strongly retain borrowed sources. Higher priority wins; later insertion wins ties.
+A child host contributes its resolved output as a group. Tag union membership is deduplicated by
+element identity, independent of priority; returned host tag arrays have unspecified order.
+No layer IDs, layer objects, selector records, override modes, or name-list methods are public.
 
-## AnatomyHostOptions
+## AnatomyTemplate and AnatomyInstance
 
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
+`anatomyTemplate.new(asset, options)` recognizes authored attributes and captures immutable descriptors.
+Options require typed identity-preserving `socketNameGuard` and `tagGuard`, each `(unknown) -> T`.
+Optional fields: `socketAttribute`, `tagsAttribute`, `tagDelimiter`, `tagPathDelimiter`,
+`category`, `metadata`, and `instancePolicy`. No template ID is accepted.
+`RecognizeOptions` and its existing `RecognizeConfig` alias describe those options.
 
-Options for constructing a host. Both generic arguments are inferred from the
-required typed guard returns. The option fields are read-only to Anatomy, allowing
-it to consume ordinary caller tables or frozen configuration without mutation.
+Templates expose `getSource`, `getCategory`, `getMetadata`, `instantiate(parent?)`, and `wrap(root)`.
+The source Roblox Instance remains caller-owned. Construction options and policy are snapshotted;
+metadata receives a shallow frozen snapshot, with arbitrary nested values retaining their existing ownership.
+Descriptors and the reused instance-construction record are internal and frozen.
 
-## AnatomyHostLayer
+Instances implement AnatomySource and expose root/template/category/metadata access, `setParent`,
+`applyInstancePolicy`, and `deconstruct`. An instantiated root is owned; a wrapped root is borrowed.
+There is no live attribute scan after recognition and no tag/socket mutation API on instances.
 
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
+## AnatomySocket and AnatomyTaggedElement
 
-Handle returned by `host:push(...)`. It exposes layer priority, the pushed instance, and removal.
+Sockets are borrowed concrete objects with `getName`, `getAttachment`, `getPath`, and `getMetadata`.
+`getAttachment` returns Attachment and rejects access after retirement. Sockets have no change event.
 
-## AnatomyHostLayerOptions
+A tagged element exposes `getInstance`, `getTags`, `hasTag`, and `getLeafUnder`.
+`getTags` returns shared frozen membership, not a clone. `hasTag` supports ancestor prefixes.
+Retired elements report no tag membership; their engine-instance access must not be used.
+Only their owning anatomy instance holds child teardown authority.
 
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
+## SocketWatcher and SocketMount
 
-Options for pushing an anatomy instance onto a host.
+`host:watchSocket(name)` returns a SocketWatcher with `getName`, `getSocket`,
+`bindSocketChanged(callback, runInitially?)`, and `deconstruct`. Its callback receives a
+socket or nil; the source-level event instead receives name plus socket. No selector is retained.
 
+`socketMount.new(from: Attachment?, to: Attachment?, options?)` owns one RigidConstraint.
+Its public methods are `getName`, `getFromAttachment`, `getToAttachment`, `getConstraint`,
+`isConnected`, `setAttachments`, `setEnabled`, `setParent`, and `deconstruct`.
+Mount options contain `name?`, `rigidName?`, `parent?`, `enabled?`.
+Omitted parent is nil, missing attachments disable the constraint, and attachment updates preserve
+requested enabled state and explicit parenting. `isConnected` does not test engine ancestry or physics.
+External owners control watcher wiring and visual-parenting policy.
 
-
-
-
-
-
-## TagChangedCallback
-
-Source: [`src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau`](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/managers/anatomyHost/shared/anatomyHost.luau)
-
-Callback used by `host:bindByTag(...)` when tagged elements enter or leave a watched prefix.
-
-## Guard and ownership migration
-
-`AnatomyHostOptions<SocketT, TagT>` requires both `socketNameGuard: NameGuard<SocketT>`
-and `tagGuard: NameGuard<TagT>`. `anatomyHost.new(options)` infers both generic arguments
-from their return types. `NameGuard<T>` re-exports the standalone Guard package's
-`GuardFn<T>`, whose signature is `(unknown) -> T`. Invalid values throw. Recognition
-options and instance policy fields likewise expose read-only consumption contracts.
-
-`AnatomySocket` and `AnatomyTaggedElement` are borrowed views. Only their instance
-owner receives the internal `Owned` contracts with `deconstruct`. A layer handle's
-`id` is read-only; removal is idempotent and a retired handle cannot affect its replacement.
-Reprioritizing a retired handle fails. `AnatomyInstance:getTaggedElements()` returns a
-snapshot of all borrowed tagged elements, including those needed for host ingress validation.
-
-`SocketSubscription<SocketT>` is the narrow host capability consumed by watcher construction.
-Its method is `bindSocket(name, callback, runInitially?, layerId?, includeOverrides?)`.
-The internal host layer command port is not a package export. Query/address records, attachment
-adapter factories, endpoint contracts, and instance-address lookup ports have been removed.
-
-Owners remove instances from hosts and clear/destroy attachment mounts before instance teardown.
-Watchers publish `nil` when their address stops resolving. Callers subscribe and explicitly update
-mounts; those subscriptions must be released before mount/host teardown. Watchers survive until
-explicitly released or their host ends. Mounts never own subscriptions or watchers.
-
-Templates snapshot configuration and descriptor tables. Descriptor records, path steps,
-paths, tag sets, and prefix sets are frozen; metadata receives a shallow frozen snapshot
-(nested arbitrary metadata values remain caller-owned). The source Roblox Instance remains live.
-Collection-returning getters retain their existing snapshot semantics.
-
-## Allocation-free reads
-
-The collection getters continue to return independent, mutable outer snapshots.
-These additional operations avoid those temporary collections:
-
-| Object | Method | Callback/result |
-| --- | --- | --- |
-| Instance | `forEachSocket(callback)` | Callback receives `(name, socket)` |
-| Instance | `forEachTaggedElement(callback)` | Callback receives each tagged element |
-| Instance | `forEachByTag(prefix, callback)` | Callback receives each prefix match |
-| Tagged element | `forEachTag(callback)` | Callback receives each complete tag |
-| Instance | `getFirstByTag(prefix)` | First match or nil |
-| Host | `getFirstByTag(prefix, layerId?)` | First match or nil |
-| Instance | `getLastByTag(prefix)` | Last match or nil |
-| Host | `getLastByTag(prefix, layerId?)` | Last match or nil |
-
-Traversal is synchronous and borrows object references without exposing backing tables.
-Callbacks must not destroy or structurally mutate the instance being traversed. Use a
-snapshot getter for mutation during iteration. Missing prefixes produce no calls; retired
-tagged elements produce no tags. Single-result selection matches the corresponding
-end of the `getByTag(...)` collection, including the unspecified set order for watched host prefixes.
-No extra source object, adapter, or public port is needed.
-
-Template construction retains one frozen instance-options record shared by all its instances.
-Recognized descriptors are frozen in place; public construction from caller descriptors still
-copies and freezes them. Metadata retains its existing shallow-snapshot behavior.
-See [allocation accounting](./allocation-review-2026-10-03.md).
+See [migration details](./source-model-review-2026-10-03.md).

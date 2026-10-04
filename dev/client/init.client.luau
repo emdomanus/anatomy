@@ -55,7 +55,6 @@ local function buildRecognizeConfig<TSocketName, TTagName>(
 	TTagName
 >
 	return {
-		id = options.id,
 		category = options.category,
 		socketAttribute = options.socketAttribute,
 		tagsAttribute = options.tagsAttribute,
@@ -75,7 +74,7 @@ local function recognizeRig<TSocketName, TTagName>(
 		TTagName
 	>
 ): Anatomy.AnatomyTemplate<TSocketName, TTagName>
-	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig(options))
+	return Anatomy.anatomyTemplate.new(root, buildRecognizeConfig(options))
 end
 
 local function recognizeAddon<TSocketName, TTagName>(
@@ -85,7 +84,7 @@ local function recognizeAddon<TSocketName, TTagName>(
 		TTagName
 	>
 ): Anatomy.AnatomyTemplate<TSocketName, TTagName>
-	return Anatomy.anatomyTemplate.recognize(root, buildRecognizeConfig(options))
+	return Anatomy.anatomyTemplate.new(root, buildRecognizeConfig(options))
 end
 
 local function wrap<TSocketName, TTagName>(
@@ -99,6 +98,29 @@ local function createHost(
 	options: Anatomy.AnatomyHostOptions<string, string>?
 ): Anatomy.AnatomyHost<string, string>
 	return Anatomy.anatomyHost.new(options or { socketNameGuard = guardName, tagGuard = guardName })
+end
+
+local function bindTags(
+	host: Anatomy.AnatomySource<string, string>,
+	prefix: string,
+	onAdded: (Anatomy.AnatomyTaggedElement<string>) -> (),
+	onRemoved: (Anatomy.AnatomyTaggedElement<string>) -> (),
+	runInitially: boolean?
+): () -> ()
+	local removeAdded = host:bindTaggedAdded(function(element)
+		if element:hasTag(prefix) then
+			onAdded(element)
+		end
+	end, runInitially)
+	local removeRemoved = host:bindTaggedRemoved(function(element)
+		if element:hasTag(prefix) then
+			onRemoved(element)
+		end
+	end)
+	return function()
+		removeAdded()
+		removeRemoved()
+	end
 end
 
 local function attach(
@@ -124,15 +146,6 @@ devRoot.Parent = Workspace
 local logLines: { string } = {}
 local consoleLabel: TextLabel? = nil
 local summaryLabel: TextLabel? = nil
-
-local function countDictionary(dictionary: { [any]: any }): number
-	local count = 0
-	for _ in dictionary do
-		count += 1
-	end
-
-	return count
-end
 
 local function appendLog(message: string): ()
 	print("[AnatomyDev] " .. message)
@@ -359,7 +372,7 @@ local function getSocketAttachment(instance: any, socketName: string): Attachmen
 end
 
 local function getBasePart(instance: any, partName: string): BasePart
-	local elements = instance:getByTag("part." .. partName)
+	local elements = instance:getTagged("part." .. partName)
 	expect(#elements == 1, "Expected exactly one tagged anatomy element for part." .. partName)
 
 	local partInstance = elements[1]:getInstance()
@@ -464,10 +477,17 @@ local function testRecognitionAndPolicy(): ()
 	local template =
 		makeTemplate("rig", "UnitRigPolicy", Color3.fromRGB(50, 180, 255), CFrame.new(-8, 2, 0))
 
-	expect(countDictionary(template:getSocketDescriptors()) == 4, "Rig should expose four sockets")
-	expect(#template:getTagDescriptors() == 2, "Rig should expose two tagged elements")
-
 	local instance = template:instantiate(devRoot)
+	local socketCount = 0
+	instance:bindSocketChanged(function()
+		socketCount += 1
+	end, true)()
+	expect(socketCount == 4, "Rig should expose four sockets")
+	local taggedCount = 0
+	instance:bindTaggedAdded(function()
+		taggedCount += 1
+	end, true)()
+	expect(taggedCount == 2, "Rig should expose two tagged elements")
 	local rightGrip = instance:getSocket("rightGrip")
 	expect(rightGrip ~= nil, "Instantiated rig should resolve rightGrip")
 	expect(rightGrip:getAttachment() ~= nil, "rightGrip should resolve a live Attachment")
@@ -498,8 +518,8 @@ local function testRecognitionAndPolicy(): ()
 		"Rig should contain an internal head constraint"
 	)
 
-	local bodyElements = instance:getByTag("body")
-	local upperElements = instance:getByTag("body.upper")
+	local bodyElements = instance:getTagged("body")
+	local upperElements = instance:getTagged("body.upper")
 	expect(#bodyElements == 2, "Body tag prefix should resolve torso and head")
 	expect(#upperElements == 2, "Nested body.upper tag prefix should resolve torso and head")
 
@@ -613,7 +633,6 @@ local function testHostReactiveSocketsAndMounts(): ()
 	local host = createHost({
 		socketNameGuard = guardName,
 		tagGuard = guardName,
-		id = "ReactiveUnitHost",
 	})
 
 	local rigA = makeInstance(
@@ -645,17 +664,11 @@ local function testHostReactiveSocketsAndMounts(): ()
 		devRoot
 	)
 
-	host:push(rigA, {
-		id = "rig",
-		priority = 0,
-	})
-	host:push(weaponA, {
-		id = "weapon",
-		priority = 10,
-	})
+	host:push(rigA, 0)
+	host:push(weaponA, 10)
 
 	local rightGripWatcher = host:watchSocket("rightGrip")
-	local weaponGripWatcher = host:watchSocket("weaponGrip", "weapon")
+	local weaponGripWatcher = host:watchSocket("weaponGrip")
 
 	local socketChangeCount = 0
 	local disconnectSocketChanged = rightGripWatcher:bindSocketChanged(
@@ -669,7 +682,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 	local bodyTagRemoveCount = 0
 	local lastAddedBodyElement: any? = nil
 	local lastRemovedBodyElement: any? = nil
-	local disconnectBodyTags = host:bindByTag("body.upper", function(element: any)
+	local disconnectBodyTags = bindTags(host, "body.upper", function(element: any)
 		bodyTagAddCount += 1
 		lastAddedBodyElement = element
 		expect(element:hasTag("body.upper"), "Body tag add should come from the nested body prefix")
@@ -686,7 +699,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 	local trailTagRemoveCount = 0
 	local lastAddedTrailElement: any? = nil
 	local lastRemovedTrailElement: any? = nil
-	local disconnectTrailTags = host:bindByTag("effect.trail", function(element: any)
+	local disconnectTrailTags = bindTags(host, "effect.trail", function(element: any)
 		trailTagAddCount += 1
 		lastAddedTrailElement = element
 		expect(
@@ -718,18 +731,18 @@ local function testHostReactiveSocketsAndMounts(): ()
 			== getSocketAttachment(weaponA, "weaponGrip"),
 		"Host should expose weapon A grip"
 	)
-	expect(#host:getByTag("body") == 2, "Host should expose two rig body-tagged elements")
-	expect(#host:getByTag("body.upper") == 2, "Host should expose two nested body elements")
+	expect(#host:getTagged("body") == 2, "Host should expose two rig body-tagged elements")
+	expect(#host:getTagged("body.upper") == 2, "Host should expose two nested body elements")
 	expect(
-		#host:getByTag("material.metal") == 2,
+		#host:getTagged("material.metal") == 2,
 		"Host should expose two nested metal weapon elements"
 	)
 	expect(
-		#host:getByTag("effect.trail") == 2,
+		#host:getTagged("effect.trail") == 2,
 		"Host should expose two nested trail weapon elements"
 	)
 	expect(
-		#host:getByTag("material.metal", "weapon") == 2,
+		#weaponA:getTagged("material.metal") == 2,
 		"Layer tag query should expose only weapon metal elements"
 	)
 	expect(bodyTagAddCount == 2, "Body tag binding should run initially for torso and head")
@@ -746,9 +759,9 @@ local function testHostReactiveSocketsAndMounts(): ()
 	)
 	expect(mount:isConnected(), "Reactive host mount should connect initially")
 
-	host:remove("weapon")
+	host:remove(weaponA)
 	expect(
-		#host:getByTag("effect.trail") == 0,
+		#host:getTagged("effect.trail") == 0,
 		"Trail tag prefix should clear when weapon layer is removed"
 	)
 	expect(trailTagRemoveCount == 2, "Trail tag binding should fire for handle and blade removal")
@@ -756,10 +769,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 		lastRemovedTrailElement ~= nil and lastRemovedTrailElement:hasTag("effect.trail"),
 		"Removed trail tag should still describe the removed element"
 	)
-	host:push(weaponB, {
-		id = "weapon",
-		priority = 10,
-	})
+	host:push(weaponB, 10)
 	expect(
 		assert(weaponGripWatcher:getSocket(), "Expected weapon grip socket"):getAttachment()
 			== getSocketAttachment(weaponB, "weaponGrip"),
@@ -770,11 +780,11 @@ local function testHostReactiveSocketsAndMounts(): ()
 		"Reactive mount should follow weapon layer swap"
 	)
 	expect(
-		#host:getByTag("material.metal") == 2,
+		#host:getTagged("material.metal") == 2,
 		"Host metal tag prefix should follow weapon layer swap"
 	)
 	expect(
-		#host:getByTag("effect.trail") == 2,
+		#host:getTagged("effect.trail") == 2,
 		"Host trail tag prefix should follow weapon layer swap"
 	)
 	expect(trailTagAddCount == 4, "Trail tag binding should fire when weapon B is pushed")
@@ -783,13 +793,13 @@ local function testHostReactiveSocketsAndMounts(): ()
 		"Added trail tag should still describe the added element"
 	)
 
-	host:remove("rig")
+	host:remove(rigA)
 	expect(
-		#host:getByTag("body") == 0,
+		#host:getTagged("body") == 0,
 		"Host body tag prefix should clear when rig layer is removed"
 	)
 	expect(
-		#host:getByTag("body.upper") == 0,
+		#host:getTagged("body.upper") == 0,
 		"Host nested body tag prefix should clear when rig layer is removed"
 	)
 	expect(bodyTagRemoveCount == 2, "Body tag binding should fire for torso and head removal")
@@ -797,10 +807,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 		lastRemovedBodyElement ~= nil and lastRemovedBodyElement:hasTag("body.upper"),
 		"Removed body tag should still describe the removed element"
 	)
-	host:push(rigB, {
-		id = "rig",
-		priority = 0,
-	})
+	host:push(rigB, 0)
 	expect(
 		assert(rightGripWatcher:getSocket(), "Expected right grip socket"):getAttachment()
 			== getSocketAttachment(rigB, "rightGrip"),
@@ -810,9 +817,9 @@ local function testHostReactiveSocketsAndMounts(): ()
 		mount:getToAttachment() == getSocketAttachment(rigB, "rightGrip"),
 		"Reactive mount should follow rig layer swap"
 	)
-	expect(#host:getByTag("body") == 2, "Host body tag prefix should follow rig layer swap")
+	expect(#host:getTagged("body") == 2, "Host body tag prefix should follow rig layer swap")
 	expect(
-		#host:getByTag("body.upper") == 2,
+		#host:getTagged("body.upper") == 2,
 		"Host nested body tag prefix should follow rig layer swap"
 	)
 	expect(bodyTagAddCount == 4, "Body tag binding should fire when rig B is pushed")
@@ -836,8 +843,7 @@ local function testHostReactiveSocketsAndMounts(): ()
 end
 
 local function testOverrideResolution(): ()
-	local host =
-		createHost({ socketNameGuard = guardName, tagGuard = guardName, id = "OverrideHost" })
+	local host = createHost({ socketNameGuard = guardName, tagGuard = guardName })
 
 	local baseRig = makeInstance(
 		"rig",
@@ -854,23 +860,16 @@ local function testOverrideResolution(): ()
 		devRoot
 	)
 
-	host:push(baseRig, {
-		id = "base",
-		priority = 0,
-	})
-	host:push(addonOverride, {
-		id = "override",
-		priority = 10,
-		allowSocketOverrides = true,
-	})
+	host:push(baseRig, 0)
+	host:push(addonOverride, 10)
 
 	expect(
 		host:getSocket("rightGrip") == addonOverride:getSocket("rightGrip"),
 		"Higher priority layer should override sockets by default"
 	)
 	expect(
-		host:getSocket("rightGrip", nil, false) == baseRig:getSocket("rightGrip"),
-		"includeOverrides=false should resolve the base socket"
+		baseRig:getSocket("rightGrip") == baseRig:getSocket("rightGrip"),
+		"Direct source queries remain independent of host selection"
 	)
 
 	host:deconstruct()
@@ -999,39 +998,30 @@ local function runStressBenchmark(count: number): ()
 		local host = createHost({
 			socketNameGuard = guardName,
 			tagGuard = guardName,
-			id = "BenchmarkHost",
 		})
-		host:push(rigInstances[1], {
-			id = "rig",
-			priority = 0,
-		})
-		host:push(weaponInstances[1], {
-			id = "weapon",
-			priority = 10,
-		})
+		host:push(rigInstances[1], 0)
+		host:push(weaponInstances[1], 10)
 
-		local weaponGripWatcher = host:watchSocket("weaponGrip", "weapon")
+		local weaponGripWatcher = host:watchSocket("weaponGrip")
 		local rightGripWatcher = host:watchSocket("rightGrip")
 		local mount = host:mount(nil, nil, {
 			parent = benchmarkFolder :: Instance,
 		})
 		local disconnectMount = bindMountWatchers(mount, weaponGripWatcher, rightGripWatcher)
 
+		local currentRig = rigInstances[1]
+		local currentWeapon = weaponInstances[1]
 		for index = 1, count do
 			local rigIndex = ((index - 1) % #rigInstances) + 1
 			local weaponIndex = ((index - 1) % #weaponInstances) + 1
 
-			host:remove("rig")
-			host:push(rigInstances[rigIndex], {
-				id = "rig",
-				priority = 0,
-			})
+			host:remove(currentRig)
+			currentRig = rigInstances[rigIndex]
+			host:push(currentRig, 0)
 
-			host:remove("weapon")
-			host:push(weaponInstances[weaponIndex], {
-				id = "weapon",
-				priority = 10,
-			})
+			host:remove(currentWeapon)
+			currentWeapon = weaponInstances[weaponIndex]
+			host:push(currentWeapon, 10)
 		end
 
 		expect(mount:isConnected(), "Benchmark reactive mount should stay connected after swaps")
@@ -1089,20 +1079,18 @@ local function refreshDemoLayers(): ()
 	activateDemoAnatomy(weapon, getDemoWeaponCFrame(demoState.activeRigIndex))
 
 	if demoState.mountedRigIndex ~= demoState.activeRigIndex then
-		host:remove("rig")
-		host:push(rig, {
-			id = "rig",
-			priority = 0,
-		})
+		if demoState.mountedRigIndex then
+			host:remove(demoState.rigInstances[demoState.mountedRigIndex])
+		end
+		host:push(rig, 0)
 		demoState.mountedRigIndex = demoState.activeRigIndex
 	end
 
 	if demoState.mountedWeaponIndex ~= demoState.activeWeaponIndex then
-		host:remove("weapon")
-		host:push(weapon, {
-			id = "weapon",
-			priority = 10,
-		})
+		if demoState.mountedWeaponIndex then
+			host:remove(demoState.weaponInstances[demoState.mountedWeaponIndex])
+		end
+		host:push(weapon, 10)
 		demoState.mountedWeaponIndex = demoState.activeWeaponIndex
 	end
 end
@@ -1111,10 +1099,9 @@ local function setupDemo(): ()
 	local host = createHost({
 		socketNameGuard = guardName,
 		tagGuard = guardName,
-		id = "InteractiveDemoHost",
 	})
 	demoState.host = host
-	demoState.weaponWatcher = host:watchSocket("weaponGrip", "weapon")
+	demoState.weaponWatcher = host:watchSocket("weaponGrip")
 	demoState.rigWatcher = host:watchSocket("rightGrip")
 	demoState.rigInstances = {
 		makeInstance(

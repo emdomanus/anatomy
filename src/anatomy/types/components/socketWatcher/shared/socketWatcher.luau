@@ -11,7 +11,6 @@ export type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
 type CallbackSet<Args...> = CallbackSetTypes.CallbackSet<Args...>
 export type SocketChangedCallback<SocketT> = SocketSubscriptionTypes.SocketChangedCallback<SocketT>
 export type SocketSubscription<SocketT> = SocketSubscriptionTypes.SocketSubscription<SocketT>
-export type LayerId = SocketSubscriptionTypes.LayerId
 
 export type SocketWatcher<SocketT> = {
 	read getName: (self: SocketWatcher<SocketT>) -> SocketT,

@@ -7,7 +7,6 @@ type AnatomyPath = AnatomyTypes.AnatomyPath
 export type AnatomyTaggedElement<TagT> = {
 	read getInstance: (self: AnatomyTaggedElement<TagT>) -> Instance,
 	read getTags: (self: AnatomyTaggedElement<TagT>) -> { [TagT]: true },
-	read forEachTag: (self: AnatomyTaggedElement<TagT>, callback: (TagT) -> ()) -> (),
 	read hasTag: (self: AnatomyTaggedElement<TagT>, prefix: string) -> boolean,
 	read getLeafUnder: (self: AnatomyTaggedElement<TagT>, prefix: string) -> string?,
 }

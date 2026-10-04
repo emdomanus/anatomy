@@ -10,17 +10,11 @@ type SocketWatcher<SocketT> = SocketWatcherTypes.SocketWatcher<SocketT>
 type SocketWatcherImpl<SocketT> = SocketWatcherTypes.SocketWatcherImpl<SocketT>
 type SocketSubscription<SocketT> = SocketWatcherTypes.SocketSubscription<SocketT>
 type SocketChangedCallback<SocketT> = SocketWatcherTypes.SocketChangedCallback<SocketT>
-type LayerId = SocketWatcherTypes.LayerId
 
 local SocketWatcher = {}
 SocketWatcher.__index = SocketWatcher
 
-local function new<SocketT>(
-	source: SocketSubscription<SocketT>,
-	name: SocketT,
-	layerId: LayerId?,
-	includeOverrides: boolean?
-): SocketWatcher<SocketT>
+local function new<SocketT>(source: SocketSubscription<SocketT>, name: SocketT): SocketWatcher<SocketT>
 	local self: SocketWatcherImpl<SocketT> =
 		setmetatable({}, SocketWatcher) :: SocketWatcherImpl<SocketT>
 	self._name = name
@@ -28,9 +22,14 @@ local function new<SocketT>(
 	self._socketChangedCallbacks = {}
 	self._sourceDisconnect = nil
 	self._destroyed = false
-	self._sourceDisconnect = source:bindSocket(name, function(socket: AnatomySocket<SocketT>?)
-		self:_setSocket(socket)
-	end, true, layerId, includeOverrides)
+	self._sourceDisconnect = source:bindSocketChanged(
+		function(changedName: SocketT, socket: AnatomySocket<SocketT>?)
+			if changedName == name then
+				self:_setSocket(socket)
+			end
+		end,
+		true
+	)
 	return self
 end
 

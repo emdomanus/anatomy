@@ -11,7 +11,6 @@ local AnatomyTemplateTypes = require(
 )
 
 type AnatomyCategory = AnatomyTemplateTypes.AnatomyCategory
-type AnatomyId = AnatomyTemplateTypes.AnatomyId
 type AnatomyTemplate<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplate<SocketT, TagT>
 type AnatomyTemplateImpl<SocketT, TagT> = AnatomyTemplateTypes.AnatomyTemplateImpl<SocketT, TagT>
 type AnatomyInstance<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstance<
@@ -27,51 +26,8 @@ type TagDescriptor<TagT> = AnatomyTemplateTypes.TagDescriptor<TagT>
 type AnatomyPath = AnatomyTemplateTypes.AnatomyPath
 type InstancePolicy = AnatomyTemplateTypes.InstancePolicy
 
-local function snapshotPath(path: AnatomyPath): AnatomyPath
-	local result: AnatomyPath = {}
-	for _, step in path do
-		table.insert(result, table.freeze(table.clone(step)))
-	end
-	return table.freeze(result)
-end
-
 local function snapshotMetadata(metadata: DescriptorMetadata?): DescriptorMetadata?
 	return if metadata == nil then nil else table.freeze(table.clone(metadata))
-end
-
-local function snapshotSocketDescriptors<SocketT>(
-	descriptors: { [SocketT]: SocketDescriptor<SocketT> }?
-): { [SocketT]: SocketDescriptor<SocketT> }
-	local result: { [SocketT]: SocketDescriptor<SocketT> } = {}
-	if descriptors ~= nil then
-		for name, descriptor in descriptors do
-			result[name] = table.freeze({
-				name = descriptor.name,
-				path = snapshotPath(descriptor.path),
-				metadata = snapshotMetadata(descriptor.metadata),
-			})
-		end
-	end
-	return table.freeze(result)
-end
-
-local function snapshotTagDescriptors<TagT>(
-	descriptors: { TagDescriptor<TagT> }?
-): { TagDescriptor<TagT> }
-	local result: { TagDescriptor<TagT> } = {}
-	if descriptors ~= nil then
-		for _, descriptor in descriptors do
-			table.insert(
-				result,
-				table.freeze({
-					path = snapshotPath(descriptor.path),
-					tags = table.freeze(table.clone(descriptor.tags)),
-					prefixes = table.freeze(table.clone(descriptor.prefixes)),
-				})
-			)
-		end
-	end
-	return table.freeze(result)
 end
 
 local function getAttributeName(attributeName: string?): string?
@@ -191,11 +147,9 @@ local function createTemplate<SocketT, TagT>(
 	local self: AnatomyTemplateImpl<SocketT, TagT> =
 		setmetatable({}, AnatomyTemplate) :: AnatomyTemplateImpl<SocketT, TagT>
 
-	self._id = config.id
 	self._category = config.category
 	self._source = source
 	local options: RecognizeConfig<SocketT, TagT> = table.freeze({
-		id = config.id,
 		category = config.category,
 		socketAttribute = config.socketAttribute,
 		tagsAttribute = config.tagsAttribute,
@@ -237,7 +191,7 @@ local function createTemplate<SocketT, TagT>(
 	return self
 end
 
-function AnatomyTemplate.recognize<SocketT, TagT>(
+function AnatomyTemplate.new<SocketT, TagT>(
 	root: Instance,
 	config: RecognizeConfig<SocketT, TagT>
 ): AnatomyTemplate<SocketT, TagT>
@@ -310,24 +264,6 @@ function AnatomyTemplate.recognize<SocketT, TagT>(
 	)
 end
 
-function AnatomyTemplate.new<SocketT, TagT>(
-	source: Instance,
-	config: RecognizeConfig<SocketT, TagT>,
-	socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> }?,
-	tagDescriptors: { TagDescriptor<TagT> }?
-): AnatomyTemplate<SocketT, TagT>
-	return createTemplate(
-		source,
-		config,
-		snapshotSocketDescriptors(socketDescriptors),
-		snapshotTagDescriptors(tagDescriptors)
-	)
-end
-
-function AnatomyTemplate.getId<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): AnatomyId?
-	return self._id
-end
-
 function AnatomyTemplate.getCategory<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): AnatomyCategory?
 	return self._category
 end
@@ -338,25 +274,6 @@ end
 
 function AnatomyTemplate.getMetadata<SocketT, TagT>(self: AnatomyTemplateImpl<SocketT, TagT>): DescriptorMetadata?
 	return self._metadata
-end
-
-function AnatomyTemplate.getSocketDescriptor<SocketT, TagT>(
-	self: AnatomyTemplateImpl<SocketT, TagT>,
-	name: SocketT
-): SocketDescriptor<SocketT>?
-	return self._socketDescriptors[name]
-end
-
-function AnatomyTemplate.getSocketDescriptors<SocketT, TagT>(
-	self: AnatomyTemplateImpl<SocketT, TagT>
-): { [SocketT]: SocketDescriptor<SocketT> }
-	return table.clone(self._socketDescriptors)
-end
-
-function AnatomyTemplate.getTagDescriptors<SocketT, TagT>(
-	self: AnatomyTemplateImpl<SocketT, TagT>
-): { TagDescriptor<TagT> }
-	return table.clone(self._tagDescriptors)
 end
 
 function AnatomyTemplate.instantiate<SocketT, TagT>(

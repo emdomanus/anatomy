@@ -4,6 +4,8 @@
 local AnatomySocketTypes = require(script.Parent.Parent.Parent.anatomySocket.shared.anatomySocket)
 local AnatomyTaggedElementTypes =
 	require(script.Parent.Parent.Parent.anatomyTaggedElement.shared.anatomyTaggedElement)
+local SourceTypes =
+	require(script.Parent.Parent.Parent.Parent.ports.anatomySource.shared.anatomySource)
 local AnatomyTypes = require(script.Parent.Parent.Parent.Parent.def.anatomy.shared.anatomy)
 
 type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
@@ -13,55 +15,16 @@ type AnatomyTaggedElementOwned<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedEl
 type AnatomyPath = AnatomyTypes.AnatomyPath
 
 export type AnatomyCategory = AnatomyTypes.AnatomyCategory
-export type AnatomyId = AnatomyTypes.AnatomyId
 export type DescriptorMetadata = AnatomyTypes.DescriptorMetadata
 export type InstancePolicy = AnatomyTypes.InstancePolicy
 export type SocketDescriptor<SocketT> = AnatomyTypes.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = AnatomyTypes.TagDescriptor<TagT>
 
-export type AnatomyInstance<TemplateT, SocketT, TagT> = {
-	read getSocket: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>,
-		name: SocketT
-	) -> AnatomySocket<SocketT>?,
-	read getId: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> AnatomyId?,
+export type AnatomyInstance<TemplateT, SocketT, TagT> = SourceTypes.AnatomySource<SocketT, TagT> & {
 	read getCategory: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> AnatomyCategory?,
 	read getRoot: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> Instance,
 	read getTemplate: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> TemplateT,
 	read getMetadata: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> DescriptorMetadata?,
-
-	read forEachSocket: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>,
-		callback: (SocketT, AnatomySocket<SocketT>) -> ()
-	) -> (),
-	read forEachTaggedElement: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>,
-		callback: (AnatomyTaggedElement<TagT>) -> ()
-	) -> (),
-	read forEachByTag: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>,
-		prefix: string,
-		callback: (AnatomyTaggedElement<TagT>) -> ()
-	) -> (),
-	read getFirstByTag: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>,
-		prefix: string
-	) -> AnatomyTaggedElement<TagT>?,
-	read getLastByTag: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>,
-		prefix: string
-	) -> AnatomyTaggedElement<TagT>?,
-	read getSockets: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>
-	) -> { [SocketT]: AnatomySocket<SocketT> },
-	read getByTag: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>,
-		prefix: string
-	) -> { AnatomyTaggedElement<TagT> },
-
-	read getTaggedElements: (
-		self: AnatomyInstance<TemplateT, SocketT, TagT>
-	) -> { AnatomyTaggedElement<TagT> },
 
 	read setParent: (self: AnatomyInstance<TemplateT, SocketT, TagT>, parent: Instance?) -> (),
 	read applyInstancePolicy: (
@@ -78,7 +41,6 @@ export type AnatomyInstanceImpl<TemplateT, SocketT, TagT> = AnatomyInstance<
 > & {
 	_template: TemplateT,
 	_root: Instance,
-	_id: AnatomyId?,
 	_category: AnatomyCategory?,
 	_metadata: DescriptorMetadata?,
 	_ownsRoot: boolean,

@@ -12,6 +12,8 @@ type AnatomyTaggedElementOwned<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedEl
 type AnatomyTaggedElementImpl<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElementImpl<TagT>
 type TagDescriptor<TagT> = AnatomyTypes.TagDescriptor<TagT>
 
+local emptyTags = table.freeze({})
+
 local AnatomyTaggedElement = {}
 AnatomyTaggedElement.__index = AnatomyTaggedElement
 
@@ -55,22 +57,10 @@ end
 
 function AnatomyTaggedElement.getTags<TagT>(self: AnatomyTaggedElementImpl<TagT>): { [TagT]: true }
 	if self._destroyed then
-		return {}
+		return emptyTags :: { [TagT]: true }
 	end
 
-	return table.clone(self._tags)
-end
-
-function AnatomyTaggedElement.forEachTag<TagT>(
-	self: AnatomyTaggedElementImpl<TagT>,
-	callback: (TagT) -> ()
-): ()
-	if self._destroyed then
-		return
-	end
-	for tag in self._tags do
-		callback(tag)
-	end
+	return self._tags
 end
 
 function AnatomyTaggedElement.hasTag<TagT>(self: AnatomyTaggedElementImpl<TagT>, prefix: string): boolean

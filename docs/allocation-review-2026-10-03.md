@@ -1,5 +1,8 @@
 # Anatomy allocation checkpoint â€” 2026-10-03
 
+This is a historical checkpoint. The current contract and verification are in the
+[source-model checkpoint](./source-model-review-2026-10-03.md).
+
 Non-YouTrack task, local checkout `C:/Users/edwar/Documents/RobloxProjects/anatomy`,
 branch `main`. Accepted socket/watcher/explicit-mount changes were committed as
 `3738a5a` before this work. This performance continuation is uncommitted. Plinth,
