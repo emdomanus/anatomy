@@ -47,18 +47,18 @@ end
 
 local function disconnect<S, T>(registration: Registration<S, T>): ()
 	registration.active = false
-	if registration.disconnectSockets then
-		registration.disconnectSockets()
+	if registration.disconnectSocketChanged then
+		registration.disconnectSocketChanged()
 	end
-	if registration.disconnectAdded then
-		registration.disconnectAdded()
+	if registration.disconnectTaggedAdded then
+		registration.disconnectTaggedAdded()
 	end
-	if registration.disconnectRemoved then
-		registration.disconnectRemoved()
+	if registration.disconnectTaggedRemoved then
+		registration.disconnectTaggedRemoved()
 	end
-	registration.disconnectSockets = nil
-	registration.disconnectAdded = nil
-	registration.disconnectRemoved = nil
+	registration.disconnectSocketChanged = nil
+	registration.disconnectTaggedAdded = nil
+	registration.disconnectTaggedRemoved = nil
 end
 
 local function sortSources<S, T>(
@@ -81,12 +81,12 @@ local function new<S, T>(options: HostTypes.AnatomyHostOptions<S, T>): Host<S, T
 	self._registrations = {}
 	self._sources = {}
 	self._resolvedSockets = {}
-	self._tagCounts = {}
-	self._socketCallbacks = {}
-	self._addedCallbacks = {}
-	self._removedCallbacks = {}
-	self._watchers = setmetatable({}, weakKeys)
-	self._mounts = setmetatable({}, weakKeys)
+	self._taggedElementCounts = {}
+	self._socketChangedCallbacks = {}
+	self._taggedAddedCallbacks = {}
+	self._taggedRemovedCallbacks = {}
+	self._socketWatchers = setmetatable({}, weakKeys)
+	self._socketMounts = setmetatable({}, weakKeys)
 	self._nextOrdinal = 1
 	self._destroyed = false
 	hostSources[self] = self._sources :: { unknown }
@@ -96,7 +96,7 @@ end
 function AnatomyHost._refreshSocket<S, T>(self: Impl<S, T>, name: S): ()
 	local selected: Socket<S>? = nil
 	for index = #self._sources, 1, -1 do
-		selected = self._registrations[self._sources[index]].sockets[name]
+		selected = self._registrations[self._sources[index]].socketsByName[name]
 		if selected ~= nil then
 			break
 		end
@@ -105,7 +105,7 @@ function AnatomyHost._refreshSocket<S, T>(self: Impl<S, T>, name: S): ()
 		return
 	end
 	self._resolvedSockets[name] = selected
-	for callback in self._socketCallbacks do
+	for callback in self._socketChangedCallbacks do
 		-- A callback may synchronously change the winner; never deliver stale state afterward.
 		if self._resolvedSockets[name] ~= selected then
 			break
@@ -121,34 +121,34 @@ function AnatomyHost.push<S, T>(self: Impl<S, T>, source: Source<S, T>, priority
 	local registration: Registration<S, T> = {
 		priority = priority or 0,
 		ordinal = self._nextOrdinal,
-		sockets = {},
-		tags = {},
+		socketsByName = {},
+		taggedElements = {},
 		active = false,
 	}
 	-- Stage and validate initial membership before making the registration visible.
 	-- On rejection release every subscription acquired so far.
 	local ok, failure = pcall(function(): unknown
-		registration.disconnectSockets = source:bindSocketChanged(function(name, socket)
+		registration.disconnectSocketChanged = source:bindSocketChanged(function(name, socket)
 			assert(self._socketNameGuard(name) == name, "Invalid source socket name")
-			registration.sockets[name] = socket
+			registration.socketsByName[name] = socket
 			if registration.active then
 				self:_refreshSocket(name)
 			end
 		end, true)
-		registration.disconnectAdded = source:bindTaggedAdded(function(element)
+		registration.disconnectTaggedAdded = source:bindTaggedAdded(function(element)
 			for tag in element:getTags() do
 				assert(self._tagGuard(tag) == tag, "Invalid source tag")
 			end
-			if registration.tags[element] then
+			if registration.taggedElements[element] then
 				return
 			end
-			registration.tags[element] = true
+			registration.taggedElements[element] = true
 			if registration.active then
-				local count = self._tagCounts[element] or 0
-				self._tagCounts[element] = count + 1
+				local count = self._taggedElementCounts[element] or 0
+				self._taggedElementCounts[element] = count + 1
 				if count == 0 then
-					for callback in self._addedCallbacks do
-						if self._tagCounts[element] == nil then
+					for callback in self._taggedAddedCallbacks do
+						if self._taggedElementCounts[element] == nil then
 							break
 						end
 						callback(element)
@@ -156,17 +156,17 @@ function AnatomyHost.push<S, T>(self: Impl<S, T>, source: Source<S, T>, priority
 				end
 			end
 		end, true)
-		registration.disconnectRemoved = source:bindTaggedRemoved(function(element)
-			if not registration.tags[element] then
+		registration.disconnectTaggedRemoved = source:bindTaggedRemoved(function(element)
+			if not registration.taggedElements[element] then
 				return
 			end
-			registration.tags[element] = nil
+			registration.taggedElements[element] = nil
 			if registration.active then
-				local count = self._tagCounts[element]
-				self._tagCounts[element] = if count == 1 then nil else count - 1
+				local count = self._taggedElementCounts[element]
+				self._taggedElementCounts[element] = if count == 1 then nil else count - 1
 				if count == 1 then
-					for callback in self._removedCallbacks do
-						if self._tagCounts[element] ~= nil then
+					for callback in self._taggedRemovedCallbacks do
+						if self._taggedElementCounts[element] ~= nil then
 							break
 						end
 						callback(element)
@@ -190,26 +190,26 @@ function AnatomyHost.push<S, T>(self: Impl<S, T>, source: Source<S, T>, priority
 	table.insert(self._sources, source)
 	sortSources(self._sources, self._registrations)
 	registration.active = true
-	local added: { Element<T> } = {}
-	for element in registration.tags do
-		local count = self._tagCounts[element] or 0
-		self._tagCounts[element] = count + 1
+	local addedTaggedElements: { Element<T> } = {}
+	for element in registration.taggedElements do
+		local count = self._taggedElementCounts[element] or 0
+		self._taggedElementCounts[element] = count + 1
 		if count == 0 then
-			table.insert(added, element)
+			table.insert(addedTaggedElements, element)
 		end
 	end
-	for name in registration.sockets do
+	for name in registration.socketsByName do
 		if not registration.active then
 			break
 		end
 		self:_refreshSocket(name)
 	end
-	for _, element in added do
+	for _, element in addedTaggedElements do
 		if not registration.active then
 			break
 		end
-		for callback in self._addedCallbacks do
-			if self._tagCounts[element] == nil then
+		for callback in self._taggedAddedCallbacks do
+			if self._taggedElementCounts[element] == nil then
 				break
 			end
 			callback(element)
@@ -228,20 +228,20 @@ function AnatomyHost.remove<S, T>(self: Impl<S, T>, source: Source<S, T>): boole
 	if index then
 		table.remove(self._sources, index)
 	end
-	local removed: { Element<T> } = {}
-	for element in registration.tags do
-		local count = self._tagCounts[element]
-		self._tagCounts[element] = if count == 1 then nil else count - 1
+	local removedTaggedElements: { Element<T> } = {}
+	for element in registration.taggedElements do
+		local count = self._taggedElementCounts[element]
+		self._taggedElementCounts[element] = if count == 1 then nil else count - 1
 		if count == 1 then
-			table.insert(removed, element)
+			table.insert(removedTaggedElements, element)
 		end
 	end
-	for name in registration.sockets do
+	for name in registration.socketsByName do
 		self:_refreshSocket(name)
 	end
-	for _, element in removed do
-		for callback in self._removedCallbacks do
-			if self._tagCounts[element] ~= nil then
+	for _, element in removedTaggedElements do
+		for callback in self._taggedRemovedCallbacks do
+			if self._taggedElementCounts[element] ~= nil then
 				break
 			end
 			callback(element)
@@ -258,7 +258,7 @@ function AnatomyHost.setPriority<S, T>(self: Impl<S, T>, source: Source<S, T>, p
 	end
 	registration.priority = priority
 	sortSources(self._sources, self._registrations)
-	for name in registration.sockets do
+	for name in registration.socketsByName do
 		if not registration.active then
 			break
 		end
@@ -279,7 +279,7 @@ end
 
 function AnatomyHost.getTagged<S, T>(self: Impl<S, T>, prefix: string): { Element<T> }
 	local result: { Element<T> } = {}
-	for element in self._tagCounts do
+	for element in self._taggedElementCounts do
 		if element:hasTag(prefix) then
 			table.insert(result, element)
 		end
@@ -293,7 +293,7 @@ function AnatomyHost.bindSocketChanged<S, T>(
 	runInitially: boolean?
 ): () -> ()
 	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyHost")
-	local release = CallbackSet.bind(self._socketCallbacks, callback)
+	local release = CallbackSet.bind(self._socketChangedCallbacks, callback)
 	if runInitially then
 		local ok, failure = pcall(function(): unknown
 			for name, socket in self._resolvedSockets do
@@ -315,10 +315,10 @@ function AnatomyHost.bindTaggedAdded<S, T>(
 	runInitially: boolean?
 ): () -> ()
 	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyHost")
-	local release = CallbackSet.bind(self._addedCallbacks, callback)
+	local release = CallbackSet.bind(self._taggedAddedCallbacks, callback)
 	if runInitially then
 		local ok, failure = pcall(function(): unknown
-			for element in self._tagCounts do
+			for element in self._taggedElementCounts do
 				callback(element)
 			end
 			return nil
@@ -333,14 +333,14 @@ end
 
 function AnatomyHost.bindTaggedRemoved<S, T>(self: Impl<S, T>, callback: (Element<T>) -> ()): () -> ()
 	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyHost")
-	return CallbackSet.bind(self._removedCallbacks, callback)
+	return CallbackSet.bind(self._taggedRemovedCallbacks, callback)
 end
 
 function AnatomyHost.watchSocket<S, T>(self: Impl<S, T>, name: S): WatcherTypes.SocketWatcher<S>
 	assert(not self._destroyed, "Cannot use a destroyed AnatomyHost")
 	assert(self._socketNameGuard(name) == name, "Invalid socket name")
 	local watcher = SocketWatcher.new(self, name)
-	self._watchers[watcher] = true
+	self._socketWatchers[watcher] = true
 	return watcher
 end
 
@@ -352,7 +352,7 @@ function AnatomyHost.mount<S, T>(
 ): MountTypes.SocketMount
 	assert(not self._destroyed, "Cannot use a destroyed AnatomyHost")
 	local mount = SocketMount.new(from, to, options)
-	self._mounts[mount] = true
+	self._socketMounts[mount] = true
 	return mount
 end
 
@@ -361,10 +361,10 @@ function AnatomyHost.deconstruct<S, T>(self: Impl<S, T>): ()
 		return
 	end
 	self._destroyed = true
-	for mount in self._mounts do
+	for mount in self._socketMounts do
 		mount:deconstruct()
 	end
-	for watcher in self._watchers do
+	for watcher in self._socketWatchers do
 		watcher:deconstruct()
 	end
 	for _, registration in self._registrations do
@@ -373,12 +373,12 @@ function AnatomyHost.deconstruct<S, T>(self: Impl<S, T>): ()
 	table.clear(self._registrations)
 	table.clear(self._sources)
 	table.clear(self._resolvedSockets)
-	table.clear(self._tagCounts)
-	table.clear(self._socketCallbacks)
-	table.clear(self._addedCallbacks)
-	table.clear(self._removedCallbacks)
-	table.clear(self._watchers)
-	table.clear(self._mounts)
+	table.clear(self._taggedElementCounts)
+	table.clear(self._socketChangedCallbacks)
+	table.clear(self._taggedAddedCallbacks)
+	table.clear(self._taggedRemovedCallbacks)
+	table.clear(self._socketWatchers)
+	table.clear(self._socketMounts)
 	hostSources[self] = nil
 end
 
