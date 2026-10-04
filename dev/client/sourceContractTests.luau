@@ -112,7 +112,8 @@ local function run(): ()
 		"Tags should return the same frozen set"
 	)
 	reject(function()
-		tags["bad"] = true
+		-- Deliberate writable assertion tests the runtime freeze independently of the public type.
+		(tags :: { [string]: true })["bad"] = true
 	end)
 	local collection = a:getTagged("body")
 	table.clear(collection)
@@ -312,8 +313,12 @@ local function run(): ()
 	a:deconstruct()
 	b:deconstruct()
 	c:deconstruct()
+	local retiredTagCount = 0
+	for _ in element:getTags() do
+		retiredTagCount += 1
+	end
 	check(
-		next(element:getTags()) == nil and table.isfrozen(element:getTags()),
+		retiredTagCount == 0 and table.isfrozen(element:getTags()),
 		"Retired tags must be frozen empty"
 	)
 	reject(function()

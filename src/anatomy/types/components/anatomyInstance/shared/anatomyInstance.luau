@@ -4,8 +4,8 @@
 local AnatomySocketTypes = require(script.Parent.Parent.Parent.anatomySocket.shared.anatomySocket)
 local AnatomyTaggedElementTypes =
 	require(script.Parent.Parent.Parent.anatomyTaggedElement.shared.anatomyTaggedElement)
-local SourceTypes =
-	require(script.Parent.Parent.Parent.Parent.ports.anatomySource.shared.anatomySource)
+local AnatomySourceTypes =
+	require(script.Parent.Parent.Parent.Parent.ports.components.anatomySource.shared.anatomySource)
 local AnatomyTypes = require(script.Parent.Parent.Parent.Parent.def.anatomy.shared.anatomy)
 
 type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
@@ -13,6 +13,7 @@ type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement
 type AnatomySocketOwned<SocketT> = AnatomySocketTypes.AnatomySocketOwned<SocketT>
 type AnatomyTaggedElementOwned<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElementOwned<TagT>
 type AnatomyPath = AnatomyTypes.AnatomyPath
+type AnatomySource<SocketT, TagT> = AnatomySourceTypes.AnatomySource<SocketT, TagT>
 
 export type AnatomyCategory = AnatomyTypes.AnatomyCategory
 export type DescriptorMetadata = AnatomyTypes.DescriptorMetadata
@@ -20,7 +21,7 @@ export type InstancePolicy = AnatomyTypes.InstancePolicy
 export type SocketDescriptor<SocketT> = AnatomyTypes.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = AnatomyTypes.TagDescriptor<TagT>
 
-export type AnatomyInstance<TemplateT, SocketT, TagT> = SourceTypes.AnatomySource<SocketT, TagT> & {
+export type AnatomyInstance<TemplateT, SocketT, TagT> = AnatomySource<SocketT, TagT> & {
 	read getCategory: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> AnatomyCategory?,
 	read getRoot: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> Instance,
 	read getTemplate: (self: AnatomyInstance<TemplateT, SocketT, TagT>) -> TemplateT,

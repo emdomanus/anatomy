@@ -4,34 +4,46 @@
 local CallbackSet = require(script.Parent.Parent.Parent.Parent.utils.callbackSet.shared.callbackSet)
 local SocketMount =
 	require(script.Parent.Parent.Parent.Parent.components.socketMount.shared.socketMount)
-local HostTypes =
+local AnatomySourceTypes = require(
+	script.Parent.Parent.Parent.Parent.types.ports.components.anatomySource.shared.anatomySource
+)
+local AnatomyHostTypes =
 	require(script.Parent.Parent.Parent.Parent.types.managers.anatomyHost.shared.anatomyHost)
-local SocketTypes =
+local AnatomySocketTypes =
 	require(script.Parent.Parent.Parent.Parent.types.components.anatomySocket.shared.anatomySocket)
-local TaggedTypes = require(
+local AnatomyTaggedElementTypes = require(
 	script.Parent.Parent.Parent.Parent.types.components.anatomyTaggedElement.shared.anatomyTaggedElement
 )
-local MountTypes =
+local SocketMountTypes =
 	require(script.Parent.Parent.Parent.Parent.types.components.socketMount.shared.socketMount)
 
-type Source<S, T> = HostTypes.AnatomySource<S, T>
-type Host<S, T> = HostTypes.AnatomyHost<S, T>
-type Impl<S, T> = HostTypes.AnatomyHostImpl<S, T>
-type TaggedSelection<S, T> = HostTypes.TaggedSelection<S, T>
-type Registration<S, T> = HostTypes.Registration<S, T>
-type Socket<S> = SocketTypes.AnatomySocket<S>
-type Element<T> = TaggedTypes.AnatomyTaggedElement<T>
+type AnatomySource<SocketT, TagT> = AnatomySourceTypes.AnatomySource<SocketT, TagT>
+type AnatomyHostOptions<SocketT, TagT> = AnatomyHostTypes.AnatomyHostOptions<SocketT, TagT>
+type SocketMount = SocketMountTypes.SocketMount
+type SocketMountOptions = SocketMountTypes.SocketMountOptions
+type AnatomyHost<SocketT, TagT> = AnatomyHostTypes.AnatomyHost<SocketT, TagT>
+type AnatomyHostImpl<SocketT, TagT> = AnatomyHostTypes.AnatomyHostImpl<SocketT, TagT>
+type AnatomyHostTaggedSelection<SocketT, TagT> = AnatomyHostTypes.AnatomyHostTaggedSelection<
+	SocketT,
+	TagT
+>
+type AnatomyHostRegistration<SocketT, TagT> = AnatomyHostTypes.AnatomyHostRegistration<
+	SocketT,
+	TagT
+>
+type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
+type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
 
 local weakKeys = table.freeze({ __mode = "k" })
 -- Identity-only graph inspection does not depend on either source vocabulary.
 -- Values borrow the host's source array; there is no second child collection.
 local hostSources: { [unknown]: { unknown } } = setmetatable({}, weakKeys)
 
-local function reaches(source: unknown, target: unknown): boolean
-	if source == target then
+local function reaches(anatomySource: unknown, target: unknown): boolean
+	if anatomySource == target then
 		return true
 	end
-	local children = hostSources[source]
+	local children = hostSources[anatomySource]
 	if children then
 		for _, child in children do
 			if reaches(child, target) then
@@ -42,60 +54,74 @@ local function reaches(source: unknown, target: unknown): boolean
 	return false
 end
 
-local function disconnect<S, T>(registration: Registration<S, T>): ()
-	registration.active = false
-	if registration.disconnectSocketChanged then
-		registration.disconnectSocketChanged()
+local function disconnect<SocketT, TagT>(anatomyHostRegistration: AnatomyHostRegistration<SocketT, TagT>): ()
+	anatomyHostRegistration.active = false
+	if anatomyHostRegistration.disconnectSocketChanged then
+		anatomyHostRegistration.disconnectSocketChanged()
 	end
-	if registration.disconnectTaggedAdded then
-		registration.disconnectTaggedAdded()
+	if anatomyHostRegistration.disconnectTaggedAdded then
+		anatomyHostRegistration.disconnectTaggedAdded()
 	end
-	if registration.disconnectTaggedRemoved then
-		registration.disconnectTaggedRemoved()
+	if anatomyHostRegistration.disconnectTaggedRemoved then
+		anatomyHostRegistration.disconnectTaggedRemoved()
 	end
-	registration.disconnectSocketChanged = nil
-	registration.disconnectTaggedAdded = nil
-	registration.disconnectTaggedRemoved = nil
+	anatomyHostRegistration.disconnectSocketChanged = nil
+	anatomyHostRegistration.disconnectTaggedAdded = nil
+	anatomyHostRegistration.disconnectTaggedRemoved = nil
 end
 
-local function sortSources<S, T>(
-	sources: { Source<S, T> },
-	registrations: { [Source<S, T>]: Registration<S, T> }
+local function sortSources<SocketT, TagT>(
+	anatomySources: { AnatomySource<SocketT, TagT> },
+	anatomyHostRegistrations: {
+		[AnatomySource<SocketT, TagT>]: AnatomyHostRegistration<SocketT, TagT>,
+	}
 ): ()
-	table.sort(sources, function(left, right)
-		local a, b = registrations[left], registrations[right]
+	table.sort(anatomySources, function(left, right)
+		local a, b = anatomyHostRegistrations[left], anatomyHostRegistrations[right]
 		return if a.priority == b.priority then a.ordinal < b.ordinal else a.priority < b.priority
 	end)
 end
 
-local function disconnectTaggedSource<S, T>(self: Impl<S, T>, source: Source<S, T>): ()
-	for _, selection in self._taggedSelections do
-		local release = selection.disconnects[source]
+local function disconnectTaggedSource<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	anatomySource: AnatomySource<SocketT, TagT>
+): ()
+	for _, anatomyHostTaggedSelection in self._taggedSelections do
+		local release = anatomyHostTaggedSelection.disconnects[anatomySource]
 		if release then
-			selection.disconnects[source] = nil
+			anatomyHostTaggedSelection.disconnects[anatomySource] = nil
 			release()
 		end
 	end
 end
 
-local function connectTaggedSource<S, T>(
-	self: Impl<S, T>,
+local function connectTaggedSource<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string,
-	selection: TaggedSelection<S, T>,
-	source: Source<S, T>,
-	registration: Registration<S, T>
+	anatomyHostTaggedSelection: AnatomyHostTaggedSelection<SocketT, TagT>,
+	anatomySource: AnatomySource<SocketT, TagT>,
+	anatomyHostRegistration: AnatomyHostRegistration<SocketT, TagT>
 ): ()
-	selection.disconnects[source] = source:bindTopTaggedChanged(prefix, function()
-		if registration.active and self._taggedSelections[prefix] == selection then
-			self:_refreshTopTagged(prefix)
+	anatomyHostTaggedSelection.disconnects[anatomySource] = anatomySource:bindTopTaggedChanged(
+		prefix,
+		function()
+			if
+				anatomyHostRegistration.active
+				and self._taggedSelections[prefix] == anatomyHostTaggedSelection
+			then
+				self:_refreshTopTagged(prefix)
+			end
 		end
-	end)
+	)
 end
 
-local function refreshTaggedSource<S, T>(self: Impl<S, T>, registration: Registration<S, T>): ()
+local function refreshTaggedSource<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	anatomyHostRegistration: AnatomyHostRegistration<SocketT, TagT>
+): ()
 	for prefix in self._taggedSelections do
-		for element in registration.taggedElements do
-			if element:hasTag(prefix) then
+		for anatomyTaggedElement in anatomyHostRegistration.taggedElements do
+			if anatomyTaggedElement:hasTag(prefix) then
 				self:_refreshTopTagged(prefix)
 				break
 			end
@@ -103,7 +129,10 @@ local function refreshTaggedSource<S, T>(self: Impl<S, T>, registration: Registr
 	end
 end
 
-local function resolveTopTagged<S, T>(self: Impl<S, T>, prefix: string): Element<T>?
+local function resolveTopTagged<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	prefix: string
+): AnatomyTaggedElement<TagT>?
 	for index = #self._sources, 1, -1 do
 		local selected = self._sources[index]:getTopTagged(prefix)
 		if selected ~= nil then
@@ -116,8 +145,9 @@ end
 local AnatomyHost = {}
 AnatomyHost.__index = AnatomyHost
 
-local function new<S, T>(options: HostTypes.AnatomyHostOptions<S, T>): Host<S, T>
-	local self: Impl<S, T> = setmetatable({}, AnatomyHost) :: Impl<S, T>
+local function new<SocketT, TagT>(options: AnatomyHostOptions<SocketT, TagT>): AnatomyHost<SocketT, TagT>
+	local self: AnatomyHostImpl<SocketT, TagT> =
+		setmetatable({}, AnatomyHost) :: AnatomyHostImpl<SocketT, TagT>
 	self._socketNameGuard = options.socketNameGuard
 	self._tagGuard = options.tagGuard
 	self._registrations = {}
@@ -136,8 +166,8 @@ local function new<S, T>(options: HostTypes.AnatomyHostOptions<S, T>): Host<S, T
 	return self
 end
 
-function AnatomyHost._refreshSocket<S, T>(self: Impl<S, T>, name: S): ()
-	local selected: Socket<S>? = nil
+function AnatomyHost._refreshSocket<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>, name: SocketT): ()
+	local selected: AnatomySocket<SocketT>? = nil
 	for index = #self._sources, 1, -1 do
 		selected = self._registrations[self._sources[index]].socketsByName[name]
 		if selected ~= nil then
@@ -166,11 +196,15 @@ function AnatomyHost._refreshSocket<S, T>(self: Impl<S, T>, name: S): ()
 	end
 end
 
-function AnatomyHost.push<S, T>(self: Impl<S, T>, source: Source<S, T>, priority: number?): ()
+function AnatomyHost.push<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	anatomySource: AnatomySource<SocketT, TagT>,
+	priority: number?
+): ()
 	assert(not self._destroyed, "Cannot push to a destroyed AnatomyHost")
-	assert(self._registrations[source] == nil, "AnatomySource is already registered")
-	assert(not reaches(source, self), "AnatomyHost sources must not form a cycle")
-	local registration: Registration<S, T> = {
+	assert(self._registrations[anatomySource] == nil, "AnatomySource is already registered")
+	assert(not reaches(anatomySource, self), "AnatomyHost sources must not form a cycle")
+	local anatomyHostRegistration: AnatomyHostRegistration<SocketT, TagT> = {
 		priority = priority or 0,
 		ordinal = self._nextOrdinal,
 		socketsByName = {},
@@ -180,176 +214,206 @@ function AnatomyHost.push<S, T>(self: Impl<S, T>, source: Source<S, T>, priority
 	-- Stage and validate initial membership before making the registration visible.
 	-- On rejection release every subscription acquired so far.
 	local ok, failure = pcall(function(): unknown
-		registration.disconnectSocketChanged = source:bindSocketChanged(function(name, socket)
-			assert(self._socketNameGuard(name) == name, "Invalid source socket name")
-			registration.socketsByName[name] = socket
-			if registration.active then
-				self:_refreshSocket(name)
-			end
-		end, true)
-		registration.disconnectTaggedAdded = source:bindTaggedAdded(function(element)
-			for tag in element:getTags() do
-				assert(self._tagGuard(tag) == tag, "Invalid source tag")
-			end
-			if registration.taggedElements[element] then
-				return
-			end
-			registration.taggedElements[element] = true
-			if registration.active then
-				local count = self._taggedElementCounts[element] or 0
-				self._taggedElementCounts[element] = count + 1
-				if count == 0 then
-					for callback in self._taggedAddedCallbacks do
-						if self._taggedElementCounts[element] == nil then
-							break
+		anatomyHostRegistration.disconnectSocketChanged = anatomySource:bindSocketChanged(
+			function(name, anatomySocket)
+				assert(self._socketNameGuard(name) == name, "Invalid source socket name")
+				anatomyHostRegistration.socketsByName[name] = anatomySocket
+				if anatomyHostRegistration.active then
+					self:_refreshSocket(name)
+				end
+			end,
+			true
+		)
+		anatomyHostRegistration.disconnectTaggedAdded = anatomySource:bindTaggedAdded(
+			function(anatomyTaggedElement)
+				for tag in anatomyTaggedElement:getTags() do
+					assert(self._tagGuard(tag) == tag, "Invalid source tag")
+				end
+				if anatomyHostRegistration.taggedElements[anatomyTaggedElement] then
+					return
+				end
+				anatomyHostRegistration.taggedElements[anatomyTaggedElement] = true
+				if anatomyHostRegistration.active then
+					local count = self._taggedElementCounts[anatomyTaggedElement] or 0
+					self._taggedElementCounts[anatomyTaggedElement] = count + 1
+					if count == 0 then
+						for callback in self._taggedAddedCallbacks do
+							if self._taggedElementCounts[anatomyTaggedElement] == nil then
+								break
+							end
+							callback(anatomyTaggedElement)
 						end
-						callback(element)
+					end
+				end
+			end,
+			true
+		)
+		anatomyHostRegistration.disconnectTaggedRemoved = anatomySource:bindTaggedRemoved(
+			function(anatomyTaggedElement)
+				if not anatomyHostRegistration.taggedElements[anatomyTaggedElement] then
+					return
+				end
+				anatomyHostRegistration.taggedElements[anatomyTaggedElement] = nil
+				if anatomyHostRegistration.active then
+					local count = self._taggedElementCounts[anatomyTaggedElement]
+					self._taggedElementCounts[anatomyTaggedElement] = if count == 1
+						then nil
+						else count - 1
+					if count == 1 then
+						for callback in self._taggedRemovedCallbacks do
+							if self._taggedElementCounts[anatomyTaggedElement] ~= nil then
+								break
+							end
+							callback(anatomyTaggedElement)
+						end
 					end
 				end
 			end
-		end, true)
-		registration.disconnectTaggedRemoved = source:bindTaggedRemoved(function(element)
-			if not registration.taggedElements[element] then
-				return
-			end
-			registration.taggedElements[element] = nil
-			if registration.active then
-				local count = self._taggedElementCounts[element]
-				self._taggedElementCounts[element] = if count == 1 then nil else count - 1
-				if count == 1 then
-					for callback in self._taggedRemovedCallbacks do
-						if self._taggedElementCounts[element] ~= nil then
-							break
-						end
-						callback(element)
-					end
-				end
-			end
-		end)
-		for prefix, selection in self._taggedSelections do
-			connectTaggedSource(self, prefix, selection, source, registration)
+		)
+		for prefix, anatomyHostTaggedSelection in self._taggedSelections do
+			connectTaggedSource(
+				self,
+				prefix,
+				anatomyHostTaggedSelection,
+				anatomySource,
+				anatomyHostRegistration
+			)
 		end
 		assert(
-			not self._destroyed and self._registrations[source] == nil,
+			not self._destroyed and self._registrations[anatomySource] == nil,
 			"Host changed during source registration"
 		)
-		assert(not reaches(source, self), "AnatomyHost sources must not form a cycle")
+		assert(not reaches(anatomySource, self), "AnatomyHost sources must not form a cycle")
 		return nil
 	end)
 	if not ok then
-		disconnectTaggedSource(self, source)
-		disconnect(registration)
+		disconnectTaggedSource(self, anatomySource)
+		disconnect(anatomyHostRegistration)
 		error(failure, 0)
 	end
 	self._nextOrdinal += 1
-	self._registrations[source] = registration
-	table.insert(self._sources, source)
+	self._registrations[anatomySource] = anatomyHostRegistration
+	table.insert(self._sources, anatomySource)
 	sortSources(self._sources, self._registrations)
-	registration.active = true
-	local addedTaggedElements: { Element<T> } = {}
-	for element in registration.taggedElements do
-		local count = self._taggedElementCounts[element] or 0
-		self._taggedElementCounts[element] = count + 1
+	anatomyHostRegistration.active = true
+	local addedTaggedElements: { AnatomyTaggedElement<TagT> } = {}
+	for anatomyTaggedElement in anatomyHostRegistration.taggedElements do
+		local count = self._taggedElementCounts[anatomyTaggedElement] or 0
+		self._taggedElementCounts[anatomyTaggedElement] = count + 1
 		if count == 0 then
-			table.insert(addedTaggedElements, element)
+			table.insert(addedTaggedElements, anatomyTaggedElement)
 		end
 	end
-	for name in registration.socketsByName do
-		if not registration.active then
+	for name in anatomyHostRegistration.socketsByName do
+		if not anatomyHostRegistration.active then
 			break
 		end
 		self:_refreshSocket(name)
 	end
-	if registration.active then
-		refreshTaggedSource(self, registration)
+	if anatomyHostRegistration.active then
+		refreshTaggedSource(self, anatomyHostRegistration)
 	end
-	for _, element in addedTaggedElements do
-		if not registration.active then
+	for _, anatomyTaggedElement in addedTaggedElements do
+		if not anatomyHostRegistration.active then
 			break
 		end
 		for callback in self._taggedAddedCallbacks do
-			if self._taggedElementCounts[element] == nil then
+			if self._taggedElementCounts[anatomyTaggedElement] == nil then
 				break
 			end
-			callback(element)
+			callback(anatomyTaggedElement)
 		end
 	end
 end
 
-function AnatomyHost.remove<S, T>(self: Impl<S, T>, source: Source<S, T>): boolean
-	local registration = self._registrations[source]
-	if registration == nil then
+function AnatomyHost.remove<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	anatomySource: AnatomySource<SocketT, TagT>
+): boolean
+	local anatomyHostRegistration = self._registrations[anatomySource]
+	if anatomyHostRegistration == nil then
 		return false
 	end
-	disconnect(registration)
-	disconnectTaggedSource(self, source)
-	self._registrations[source] = nil
-	local index = table.find(self._sources, source)
+	disconnect(anatomyHostRegistration)
+	disconnectTaggedSource(self, anatomySource)
+	self._registrations[anatomySource] = nil
+	local index = table.find(self._sources, anatomySource)
 	if index then
 		table.remove(self._sources, index)
 	end
-	local removedTaggedElements: { Element<T> } = {}
-	for element in registration.taggedElements do
-		local count = self._taggedElementCounts[element]
-		self._taggedElementCounts[element] = if count == 1 then nil else count - 1
+	local removedTaggedElements: { AnatomyTaggedElement<TagT> } = {}
+	for anatomyTaggedElement in anatomyHostRegistration.taggedElements do
+		local count = self._taggedElementCounts[anatomyTaggedElement]
+		self._taggedElementCounts[anatomyTaggedElement] = if count == 1 then nil else count - 1
 		if count == 1 then
-			table.insert(removedTaggedElements, element)
+			table.insert(removedTaggedElements, anatomyTaggedElement)
 		end
 	end
-	for name in registration.socketsByName do
+	for name in anatomyHostRegistration.socketsByName do
 		self:_refreshSocket(name)
 	end
-	refreshTaggedSource(self, registration)
-	for _, element in removedTaggedElements do
+	refreshTaggedSource(self, anatomyHostRegistration)
+	for _, anatomyTaggedElement in removedTaggedElements do
 		for callback in self._taggedRemovedCallbacks do
-			if self._taggedElementCounts[element] ~= nil then
+			if self._taggedElementCounts[anatomyTaggedElement] ~= nil then
 				break
 			end
-			callback(element)
+			callback(anatomyTaggedElement)
 		end
 	end
 	return true
 end
 
-function AnatomyHost.setPriority<S, T>(self: Impl<S, T>, source: Source<S, T>, priority: number): ()
+function AnatomyHost.setPriority<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	anatomySource: AnatomySource<SocketT, TagT>,
+	priority: number
+): ()
 	assert(not self._destroyed, "Cannot use a destroyed AnatomyHost")
-	local registration = assert(self._registrations[source], "AnatomySource is not registered")
-	if registration.priority == priority then
+	local anatomyHostRegistration =
+		assert(self._registrations[anatomySource], "AnatomySource is not registered")
+	if anatomyHostRegistration.priority == priority then
 		return
 	end
-	registration.priority = priority
+	anatomyHostRegistration.priority = priority
 	sortSources(self._sources, self._registrations)
-	refreshTaggedSource(self, registration)
-	for name in registration.socketsByName do
-		if not registration.active then
+	refreshTaggedSource(self, anatomyHostRegistration)
+	for name in anatomyHostRegistration.socketsByName do
+		if not anatomyHostRegistration.active then
 			break
 		end
 		self:_refreshSocket(name)
 	end
 end
 
-function AnatomyHost.clear<S, T>(self: Impl<S, T>): ()
+function AnatomyHost.clear<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>): ()
 	-- Snapshot identity membership because removal callbacks can register other sources.
-	for _, source in table.clone(self._sources) do
-		self:remove(source)
+	for _, anatomySource in table.clone(self._sources) do
+		self:remove(anatomySource)
 	end
 end
 
-function AnatomyHost.getSocket<S, T>(self: Impl<S, T>, name: S): Socket<S>?
+function AnatomyHost.getSocket<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT
+): AnatomySocket<SocketT>?
 	return self._resolvedSockets[name]
 end
 
-function AnatomyHost.getTagged<S, T>(self: Impl<S, T>, prefix: string): { Element<T> }
-	local result: { Element<T> } = {}
-	local seen: { [Element<T>]: true } = {}
+function AnatomyHost.getTagged<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	prefix: string
+): { AnatomyTaggedElement<TagT> }
+	local result: { AnatomyTaggedElement<TagT> } = {}
+	local seen: { [AnatomyTaggedElement<TagT>]: true } = {}
 	-- Keep the highest-precedence occurrence of a shared element, then reverse.
 	for index = #self._sources, 1, -1 do
-		local elements = self._sources[index]:getTagged(prefix)
-		for elementIndex = #elements, 1, -1 do
-			local element = elements[elementIndex]
-			if not seen[element] then
-				seen[element] = true
-				table.insert(result, element)
+		local anatomyTaggedElements = self._sources[index]:getTagged(prefix)
+		for elementIndex = #anatomyTaggedElements, 1, -1 do
+			local anatomyTaggedElement = anatomyTaggedElements[elementIndex]
+			if not seen[anatomyTaggedElement] then
+				seen[anatomyTaggedElement] = true
+				table.insert(result, anatomyTaggedElement)
 			end
 		end
 	end
@@ -360,56 +424,71 @@ function AnatomyHost.getTagged<S, T>(self: Impl<S, T>, prefix: string): { Elemen
 	return result
 end
 
-function AnatomyHost.getTopTagged<S, T>(self: Impl<S, T>, prefix: string): Element<T>?
-	local selection = self._taggedSelections[prefix]
-	return if selection then selection.current else resolveTopTagged(self, prefix)
+function AnatomyHost.getTopTagged<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	prefix: string
+): AnatomyTaggedElement<TagT>?
+	local anatomyHostTaggedSelection = self._taggedSelections[prefix]
+	return if anatomyHostTaggedSelection
+		then anatomyHostTaggedSelection.current
+		else resolveTopTagged(self, prefix)
 end
 
-function AnatomyHost._refreshTopTagged<S, T>(self: Impl<S, T>, prefix: string): ()
-	local selection = self._taggedSelections[prefix]
-	if selection == nil then
+function AnatomyHost._refreshTopTagged<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>, prefix: string): ()
+	local anatomyHostTaggedSelection = self._taggedSelections[prefix]
+	if anatomyHostTaggedSelection == nil then
 		return
 	end
 	local selected = resolveTopTagged(self, prefix)
-	if selection.current == selected then
+	if anatomyHostTaggedSelection.current == selected then
 		return
 	end
-	selection.current = selected
-	for callback in selection.callbacks do
-		if self._taggedSelections[prefix] ~= selection or selection.current ~= selected then
+	anatomyHostTaggedSelection.current = selected
+	for callback in anatomyHostTaggedSelection.callbacks do
+		if
+			self._taggedSelections[prefix] ~= anatomyHostTaggedSelection
+			or anatomyHostTaggedSelection.current ~= selected
+		then
 			break
 		end
 		callback(selected)
 	end
 end
 
-function AnatomyHost.bindTopTaggedChanged<S, T>(
-	self: Impl<S, T>,
+function AnatomyHost.bindTopTaggedChanged<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	prefix: string,
-	callback: (Element<T>?) -> (),
+	callback: (AnatomyTaggedElement<TagT>?) -> (),
 	runInitially: boolean?
 ): () -> ()
 	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyHost")
-	local selection = self._taggedSelections[prefix]
-	if selection == nil then
-		selection = { current = self:getTopTagged(prefix), callbacks = {}, disconnects = {} }
-		self._taggedSelections[prefix] = selection
-		local created: TaggedSelection<S, T> = selection
+	local anatomyHostTaggedSelection = self._taggedSelections[prefix]
+	if anatomyHostTaggedSelection == nil then
+		anatomyHostTaggedSelection =
+			{ current = self:getTopTagged(prefix), callbacks = {}, disconnects = {} }
+		self._taggedSelections[prefix] = anatomyHostTaggedSelection
+		local created: AnatomyHostTaggedSelection<SocketT, TagT> = anatomyHostTaggedSelection
 		local ok, failure = pcall(function(): unknown
-			for _, source in self._sources do
-				connectTaggedSource(self, prefix, created, source, self._registrations[source])
+			for _, anatomySource in self._sources do
+				connectTaggedSource(
+					self,
+					prefix,
+					created,
+					anatomySource,
+					self._registrations[anatomySource]
+				)
 			end
 			return nil
 		end)
 		if not ok then
 			self._taggedSelections[prefix] = nil
-			for _, disconnectSource in selection.disconnects do
+			for _, disconnectSource in anatomyHostTaggedSelection.disconnects do
 				disconnectSource()
 			end
 			error(failure, 0)
 		end
 	end
-	local retained = selection
+	local retained = anatomyHostTaggedSelection
 	local disconnectCallback = CallbackSet.bind(retained.callbacks, callback)
 	local function release(): ()
 		disconnectCallback()
@@ -435,10 +514,10 @@ function AnatomyHost.bindTopTaggedChanged<S, T>(
 	return release
 end
 
-function AnatomyHost.bindToSocket<S, T>(
-	self: Impl<S, T>,
-	name: S,
-	callback: (Socket<S>?) -> (),
+function AnatomyHost.bindToSocket<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	name: SocketT,
+	callback: (AnatomySocket<SocketT>?) -> (),
 	runInitially: boolean?
 ): () -> ()
 	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyHost")
@@ -469,17 +548,17 @@ function AnatomyHost.bindToSocket<S, T>(
 	return release
 end
 
-function AnatomyHost.bindSocketChanged<S, T>(
-	self: Impl<S, T>,
-	callback: (S, Socket<S>?) -> (),
+function AnatomyHost.bindSocketChanged<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	callback: (SocketT, AnatomySocket<SocketT>?) -> (),
 	runInitially: boolean?
 ): () -> ()
 	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyHost")
 	local release = CallbackSet.bind(self._socketChangedCallbacks, callback)
 	if runInitially then
 		local ok, failure = pcall(function(): unknown
-			for name, socket in self._resolvedSockets do
-				callback(name, socket)
+			for name, anatomySocket in self._resolvedSockets do
+				callback(name, anatomySocket)
 			end
 			return nil
 		end)
@@ -491,17 +570,17 @@ function AnatomyHost.bindSocketChanged<S, T>(
 	return release
 end
 
-function AnatomyHost.bindTaggedAdded<S, T>(
-	self: Impl<S, T>,
-	callback: (Element<T>) -> (),
+function AnatomyHost.bindTaggedAdded<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	callback: (AnatomyTaggedElement<TagT>) -> (),
 	runInitially: boolean?
 ): () -> ()
 	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyHost")
 	local release = CallbackSet.bind(self._taggedAddedCallbacks, callback)
 	if runInitially then
 		local ok, failure = pcall(function(): unknown
-			for element in self._taggedElementCounts do
-				callback(element)
+			for anatomyTaggedElement in self._taggedElementCounts do
+				callback(anatomyTaggedElement)
 			end
 			return nil
 		end)
@@ -513,34 +592,37 @@ function AnatomyHost.bindTaggedAdded<S, T>(
 	return release
 end
 
-function AnatomyHost.bindTaggedRemoved<S, T>(self: Impl<S, T>, callback: (Element<T>) -> ()): () -> ()
+function AnatomyHost.bindTaggedRemoved<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
+	callback: (AnatomyTaggedElement<TagT>) -> ()
+): () -> ()
 	assert(not self._destroyed, "Cannot subscribe to a destroyed AnatomyHost")
 	return CallbackSet.bind(self._taggedRemovedCallbacks, callback)
 end
 
-function AnatomyHost.mount<S, T>(
-	self: Impl<S, T>,
+function AnatomyHost.mount<SocketT, TagT>(
+	self: AnatomyHostImpl<SocketT, TagT>,
 	from: Attachment?,
 	to: Attachment?,
-	options: MountTypes.SocketMountOptions?
-): MountTypes.SocketMount
+	options: SocketMountOptions?
+): SocketMount
 	assert(not self._destroyed, "Cannot use a destroyed AnatomyHost")
-	local mount = SocketMount.new(from, to, options)
-	self._socketMounts[mount] = true
-	return mount
+	local socketMount = SocketMount.new(from, to, options)
+	self._socketMounts[socketMount] = true
+	return socketMount
 end
 
-function AnatomyHost.deconstruct<S, T>(self: Impl<S, T>): ()
+function AnatomyHost.deconstruct<SocketT, TagT>(self: AnatomyHostImpl<SocketT, TagT>): ()
 	if self._destroyed then
 		return
 	end
 	self._destroyed = true
 	self:clear()
-	for mount in self._socketMounts do
-		mount:deconstruct()
+	for socketMount in self._socketMounts do
+		socketMount:deconstruct()
 	end
-	for _, registration in self._registrations do
-		disconnect(registration)
+	for _, anatomyHostRegistration in self._registrations do
+		disconnect(anatomyHostRegistration)
 	end
 	table.clear(self._registrations)
 	table.clear(self._sources)
@@ -549,12 +631,12 @@ function AnatomyHost.deconstruct<S, T>(self: Impl<S, T>): ()
 	table.clear(self._socketChangedCallbacks)
 	table.clear(self._taggedAddedCallbacks)
 	table.clear(self._taggedRemovedCallbacks)
-	for _, selection in self._taggedSelections do
-		for _, release in selection.disconnects do
+	for _, anatomyHostTaggedSelection in self._taggedSelections do
+		for _, release in anatomyHostTaggedSelection.disconnects do
 			release()
 		end
-		table.clear(selection.disconnects)
-		table.clear(selection.callbacks)
+		table.clear(anatomyHostTaggedSelection.disconnects)
+		table.clear(anatomyHostTaggedSelection.callbacks)
 	end
 	for _, callbacks in self._socketCallbacksByName do
 		table.clear(callbacks)

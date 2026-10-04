@@ -11,16 +11,16 @@ local runContractTests = require(script.contractTests)
 local bindMountSockets = require(script.bindMountSockets)
 local AnatomyDevTypes = require(game.ReplicatedStorage.anatomyDevTypes.shared.anatomyDev)
 
+type DevModelKind = AnatomyDevTypes.DevModelKind
+type TestDefinition = AnatomyDevTypes.TestDefinition
+type DemoState = AnatomyDevTypes.DemoState
+
 local DEV_ROOT_NAME = "AnatomyDev"
 local SOCKET_ATTRIBUTE = "AnatomySocket"
 local TAGS_ATTRIBUTE = "AnatomyTags"
 local DEMO_RIG_ORIGIN = CFrame.new(0, 5, -6)
 local DEMO_WEAPON_ORIGIN = CFrame.new(1.6, 5, -6)
 local DEMO_SLOT_SPACING = 4
-
-type DevModelKind = AnatomyDevTypes.DevModelKind
-type TestDefinition = AnatomyDevTypes.TestDefinition
-type DemoState = AnatomyDevTypes.DemoState
 
 local function guardName(value: unknown): string
 	assert(type(value) == "string" and value ~= "", "Expected a non-empty anatomy name")
@@ -45,12 +45,12 @@ local recognizeOptions: Anatomy.RecognizeOptions<string, string> = {
 	},
 }
 
-local function buildRecognizeConfig<TSocketName, TTagName>(
+local function buildRecognizeOptions<TSocketName, TTagName>(
 	options: Anatomy.RecognizeOptions<
 		TSocketName,
 		TTagName
 	>
-): Anatomy.RecognizeConfig<
+): Anatomy.RecognizeOptions<
 	TSocketName,
 	TTagName
 >
@@ -74,7 +74,7 @@ local function recognizeRig<TSocketName, TTagName>(
 		TTagName
 	>
 ): Anatomy.AnatomyTemplate<TSocketName, TTagName>
-	return Anatomy.anatomyTemplate.new(root, buildRecognizeConfig(options))
+	return Anatomy.anatomyTemplate.new(root, buildRecognizeOptions(options))
 end
 
 local function recognizeAddon<TSocketName, TTagName>(
@@ -84,7 +84,7 @@ local function recognizeAddon<TSocketName, TTagName>(
 		TTagName
 	>
 ): Anatomy.AnatomyTemplate<TSocketName, TTagName>
-	return Anatomy.anatomyTemplate.new(root, buildRecognizeConfig(options))
+	return Anatomy.anatomyTemplate.new(root, buildRecognizeOptions(options))
 end
 
 local function wrap<TSocketName, TTagName>(

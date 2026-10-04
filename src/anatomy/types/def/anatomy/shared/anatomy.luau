@@ -66,6 +66,5 @@ export type RecognizeOptions<SocketT, TagT> = {
 
 	read metadata: DescriptorMetadata?,
 }
-export type RecognizeConfig<SocketT, TagT> = RecognizeOptions<SocketT, TagT>
 
 return {}

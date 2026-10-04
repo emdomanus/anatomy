@@ -19,7 +19,7 @@ AnatomyTaggedElement.__index = AnatomyTaggedElement
 
 function AnatomyTaggedElement.new<TagT>(
 	path: AnatomyPath,
-	tags: { [TagT]: true },
+	tags: { read [TagT]: true },
 	prefixes: { [string]: true },
 	instance: Instance?,
 	tagPathDelimiter: string
@@ -55,9 +55,9 @@ function AnatomyTaggedElement.getInstance<TagT>(self: AnatomyTaggedElementImpl<T
 	return self._instance :: Instance
 end
 
-function AnatomyTaggedElement.getTags<TagT>(self: AnatomyTaggedElementImpl<TagT>): { [TagT]: true }
+function AnatomyTaggedElement.getTags<TagT>(self: AnatomyTaggedElementImpl<TagT>): { read [TagT]: true }
 	if self._destroyed then
-		return emptyTags :: { [TagT]: true }
+		return emptyTags :: { read [TagT]: true }
 	end
 
 	return self._tags

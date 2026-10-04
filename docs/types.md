@@ -5,7 +5,7 @@ and implementation types remain package-owned.
 
 ## AnatomySource
 
-The [source port](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/anatomySource/shared/anatomySource.luau)
+The [source port](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/components/anatomySource/shared/anatomySource.luau)
 is implemented directly by instances and hosts, with no view wrapper:
 
 ```luau
@@ -58,7 +58,7 @@ No layer IDs, layer objects, selector records, override modes, or name-list meth
 Options require typed identity-preserving `socketNameGuard` and `tagGuard`, each `(unknown) -> T`.
 Optional fields: `socketAttribute`, `tagsAttribute`, `tagDelimiter`, `tagPathDelimiter`,
 `category`, `metadata`, and `instancePolicy`. No template ID is accepted.
-`RecognizeOptions` and its existing `RecognizeConfig` alias describe those options.
+`RecognizeOptions` describes those options. The redundant `RecognizeConfig` alias has been removed.
 
 Templates expose `getSource`, `getCategory`, `getMetadata`, `instantiate(parent?)`, and `wrap(root)`.
 The source Roblox Instance remains caller-owned. Construction options and policy are snapshotted;
@@ -75,7 +75,7 @@ Sockets are borrowed concrete objects with `getName`, `getAttachment`, `getPath`
 `getAttachment` returns Attachment and rejects access after retirement. Sockets have no change event.
 
 A tagged element exposes `getInstance`, `getTags`, `hasTag`, and `getLeafUnder`.
-`getTags` returns shared frozen membership, not a clone. `hasTag` supports ancestor prefixes.
+`getTags` returns shared frozen membership through a read-only dictionary type, not a clone. `hasTag` supports ancestor prefixes.
 Retired elements report no tag membership; their engine-instance access must not be used.
 Only their owning anatomy instance holds child teardown authority.
 

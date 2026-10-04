@@ -11,12 +11,17 @@ type AnatomyInstance<TemplateT, SocketT, TagT> = AnatomyInstanceTypes.AnatomyIns
 	TagT
 >
 
+type AnatomyInstanceOptions<SocketT, TagT> = AnatomyInstanceTypes.AnatomyInstanceOptions<
+	SocketT,
+	TagT
+>
+
 export type AnatomyPath = AnatomyTypes.AnatomyPath
 export type InstancePolicy = AnatomyTypes.InstancePolicy
 
 export type AnatomyCategory = AnatomyTypes.AnatomyCategory
 export type DescriptorMetadata = AnatomyTypes.DescriptorMetadata
-export type RecognizeConfig<SocketT, TagT> = AnatomyTypes.RecognizeConfig<SocketT, TagT>
+export type RecognizeOptions<SocketT, TagT> = AnatomyTypes.RecognizeOptions<SocketT, TagT>
 export type SocketDescriptor<SocketT> = AnatomyTypes.SocketDescriptor<SocketT>
 export type TagDescriptor<TagT> = AnatomyTypes.TagDescriptor<TagT>
 
@@ -38,8 +43,8 @@ export type AnatomyTemplate<SocketT, TagT> = {
 export type AnatomyTemplateImpl<SocketT, TagT> = AnatomyTemplate<SocketT, TagT> & {
 	_category: AnatomyCategory?,
 	_source: Instance,
-	_config: RecognizeConfig<SocketT, TagT>,
-	_instanceOptions: AnatomyInstanceTypes.AnatomyInstanceOptions<SocketT, TagT>,
+	_options: RecognizeOptions<SocketT, TagT>,
+	_instanceOptions: AnatomyInstanceOptions<SocketT, TagT>,
 	_metadata: DescriptorMetadata?,
 
 	_socketDescriptors: { [SocketT]: SocketDescriptor<SocketT> },

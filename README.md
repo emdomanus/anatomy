@@ -84,7 +84,7 @@ element order; `getTopTagged(prefix)` selects the last matching element in the w
 ## Tags
 
 `AnatomyTaggedElement` describes one live Roblox Instance and its complete tag set.
-`element:getTags()` returns the same frozen table on every live call, without cloning it.
+`element:getTags()` returns the same frozen table on every live call, without cloning it. Its read-only dictionary type rejects consumer writes during type checking.
 `hasTag(prefix)` supports ancestor prefixes; `getLeafUnder(prefix)` reads a suffix.
 The tag set is immutable recognition data, not a mutable set of CollectionService tags.
 After retirement, `getTags()` returns a shared frozen empty set.

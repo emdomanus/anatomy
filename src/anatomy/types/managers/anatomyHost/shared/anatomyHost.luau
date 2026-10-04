@@ -1,31 +1,39 @@
 --!strict
-local SourceTypes =
-	require(script.Parent.Parent.Parent.Parent.ports.anatomySource.shared.anatomySource)
-local SocketTypes =
+--!optimize 2
+
+local AnatomySourceTypes =
+	require(script.Parent.Parent.Parent.Parent.ports.components.anatomySource.shared.anatomySource)
+local AnatomySocketTypes =
 	require(script.Parent.Parent.Parent.Parent.components.anatomySocket.shared.anatomySocket)
-local TaggedTypes = require(
+local AnatomyTaggedElementTypes = require(
 	script.Parent.Parent.Parent.Parent.components.anatomyTaggedElement.shared.anatomyTaggedElement
 )
-local MountTypes =
+local SocketMountTypes =
 	require(script.Parent.Parent.Parent.Parent.components.socketMount.shared.socketMount)
 local AnatomyTypes = require(script.Parent.Parent.Parent.Parent.def.anatomy.shared.anatomy)
-export type AnatomySource<SocketT, TagT> = SourceTypes.AnatomySource<SocketT, TagT>
-type Socket<SocketT> = SocketTypes.AnatomySocket<SocketT>
-type Element<TagT> = TaggedTypes.AnatomyTaggedElement<TagT>
-export type TaggedSelection<SocketT, TagT> = {
-	current: Element<TagT>?,
-	callbacks: { [SourceTypes.TaggedChangedCallback<TagT>]: true },
+type AnatomySource<SocketT, TagT> = AnatomySourceTypes.AnatomySource<SocketT, TagT>
+type AnatomySocket<SocketT> = AnatomySocketTypes.AnatomySocket<SocketT>
+type AnatomyTaggedElement<TagT> = AnatomyTaggedElementTypes.AnatomyTaggedElement<TagT>
+type NameGuard<TName> = AnatomyTypes.NameGuard<TName>
+type TaggedCallback<TagT> = AnatomySourceTypes.TaggedCallback<TagT>
+type TaggedChangedCallback<TagT> = AnatomySourceTypes.TaggedChangedCallback<TagT>
+type SocketMount = SocketMountTypes.SocketMount
+type SocketMountOptions = SocketMountTypes.SocketMountOptions
+
+export type AnatomyHostTaggedSelection<SocketT, TagT> = {
+	current: AnatomyTaggedElement<TagT>?,
+	callbacks: { [TaggedChangedCallback<TagT>]: true },
 	disconnects: { [AnatomySource<SocketT, TagT>]: () -> () },
 }
 export type AnatomyHostOptions<SocketT, TagT> = {
-	read socketNameGuard: AnatomyTypes.NameGuard<SocketT>,
-	read tagGuard: AnatomyTypes.NameGuard<TagT>,
+	read socketNameGuard: NameGuard<SocketT>,
+	read tagGuard: NameGuard<TagT>,
 }
-export type Registration<SocketT, TagT> = {
+export type AnatomyHostRegistration<SocketT, TagT> = {
 	priority: number,
 	ordinal: number,
-	socketsByName: { [SocketT]: Socket<SocketT> },
-	taggedElements: { [Element<TagT>]: true },
+	socketsByName: { [SocketT]: AnatomySocket<SocketT> },
+	taggedElements: { [AnatomyTaggedElement<TagT>]: true },
 	disconnectSocketChanged: (() -> ())?,
 	disconnectTaggedAdded: (() -> ())?,
 	disconnectTaggedRemoved: (() -> ())?,
@@ -51,23 +59,23 @@ export type AnatomyHost<SocketT, TagT> = AnatomySource<SocketT, TagT> & {
 		self: AnatomyHost<SocketT, TagT>,
 		from: Attachment?,
 		to: Attachment?,
-		options: MountTypes.SocketMountOptions?
-	) -> MountTypes.SocketMount,
+		options: SocketMountOptions?
+	) -> SocketMount,
 	read deconstruct: (self: AnatomyHost<SocketT, TagT>) -> (),
 }
 export type AnatomyHostImpl<SocketT, TagT> = AnatomyHost<SocketT, TagT> & {
-	_socketNameGuard: AnatomyTypes.NameGuard<SocketT>,
-	_tagGuard: AnatomyTypes.NameGuard<TagT>,
-	_registrations: { [AnatomySource<SocketT, TagT>]: Registration<SocketT, TagT> },
+	_socketNameGuard: NameGuard<SocketT>,
+	_tagGuard: NameGuard<TagT>,
+	_registrations: { [AnatomySource<SocketT, TagT>]: AnatomyHostRegistration<SocketT, TagT> },
 	_sources: { AnatomySource<SocketT, TagT> },
-	_resolvedSockets: { [SocketT]: Socket<SocketT> },
-	_taggedElementCounts: { [Element<TagT>]: number },
-	_socketChangedCallbacks: { [(SocketT, Socket<SocketT>?) -> ()]: true },
-	_taggedAddedCallbacks: { [SourceTypes.TaggedCallback<TagT>]: true },
-	_taggedRemovedCallbacks: { [SourceTypes.TaggedCallback<TagT>]: true },
-	_socketCallbacksByName: { [SocketT]: { [(Socket<SocketT>?) -> ()]: true } },
-	_taggedSelections: { [string]: TaggedSelection<SocketT, TagT> },
-	_socketMounts: { [MountTypes.SocketMount]: true },
+	_resolvedSockets: { [SocketT]: AnatomySocket<SocketT> },
+	_taggedElementCounts: { [AnatomyTaggedElement<TagT>]: number },
+	_socketChangedCallbacks: { [(SocketT, AnatomySocket<SocketT>?) -> ()]: true },
+	_taggedAddedCallbacks: { [TaggedCallback<TagT>]: true },
+	_taggedRemovedCallbacks: { [TaggedCallback<TagT>]: true },
+	_socketCallbacksByName: { [SocketT]: { [(AnatomySocket<SocketT>?) -> ()]: true } },
+	_taggedSelections: { [string]: AnatomyHostTaggedSelection<SocketT, TagT> },
+	_socketMounts: { [SocketMount]: true },
 	_nextOrdinal: number,
 	_destroyed: boolean,
 	_refreshTopTagged: (self: AnatomyHostImpl<SocketT, TagT>, prefix: string) -> (),

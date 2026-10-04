@@ -44,7 +44,6 @@ type InstancePolicy = AnatomyInstanceTypes.InstancePolicy
 type SocketDescriptor<SocketT> = AnatomyInstanceTypes.SocketDescriptor<SocketT>
 type TagDescriptor<TagT> = AnatomyInstanceTypes.TagDescriptor<TagT>
 type AnatomyPath = AnatomyTypes.AnatomyPath
-type RecognizeConfig<SocketT, TagT> = AnatomyTypes.RecognizeConfig<SocketT, TagT>
 
 local function forRootAndDescendants(root: Instance, callback: (Instance) -> ()): ()
 	callback(root)
