@@ -1,99 +1,159 @@
 # Public contracts
 
-`src/init.luau` selects the public constructors and canonical types. Internal descriptor, registration,
-and implementation types remain package-owned.
+`src/shared.luau` is the entry. It hands out three modules and six types, and no type takes a type
+parameter.
+
+```luau
+Anatomy.anatomyTemplate.new(elements, socketAttribute, tagsAttribute): AnatomyTemplate
+Anatomy.anatomyInstance.new(anatomyTemplate): AnatomyInstance
+Anatomy.anatomyHost.new(): AnatomyHostOwned
+
+Anatomy.AnatomyElement, Anatomy.AnatomySource, Anatomy.AnatomyTemplate,
+Anatomy.AnatomyInstance, Anatomy.AnatomyHost, Anatomy.AnatomyHostOwned
+```
+
+## AnatomyElement
+
+```luau
+export type AnatomyElement = {
+	read authoredAttributes: { read [string]: unknown },
+}
+```
+
+The one shape Anatomy declares and the asset's owner supplies. An element table is an array of
+these, `elements[elementIndex]`. A table whose records have more fields passes as it is.
+
+## AnatomyTemplate
+
+`anatomyTemplate.new(elements, socketAttribute, tagsAttribute)` reads each element's
+`authoredAttributes` once, in element-index order, and returns frozen data.
+
+- An element whose `socketAttribute` attribute is set is a socket named by that string. A name may
+  appear once per table.
+- An element whose `tagsAttribute` attribute is set is a tagged element. The string is a list of
+  tags separated by `;`. An entry is trimmed of surrounding spaces and an empty entry is skipped.
+- A socket name and a tag are each one or more segments of letters, digits and `_` joined by `.`.
+- An element is found under every prefix of each of its tags: `weapon.blade.main` is found under
+  `weapon`, `weapon.blade` and `weapon.blade.main`. A prefix is whole segments.
+- It raises, naming the element index, for an attribute that is not a string, a name that is not of
+  that form, and a socket name a lower element index already carries.
+
+```luau
+export type AnatomyTemplate = {
+	read socketNames: { read [number]: string },                 -- in element-index order
+	read socketElementIndexByName: { read [string]: number },
+	read taggedPrefixes: { read [number]: string },              -- each prefix once
+	read taggedElementIndexesByPrefix: { read [string]: { read [number]: number } },   -- ascending
+}
+```
+
+The template has no method. `anatomyInstance.new` reads the four tables, and a consumer may read
+them too, for example to check each socket's element when it loads the asset.
 
 ## AnatomySource
 
-The [source port](https://github.com/emdomanus/anatomy/blob/main/src/anatomy/types/ports/components/anatomySource/shared/anatomySource.luau)
-is implemented directly by instances and hosts, with no view wrapper:
+What a host composes. An `AnatomyInstance` and an `AnatomyHost` both implement it.
 
 ```luau
-source:getSocket(name)
-source:getTagged(prefix) -- independent array, lowest to highest precedence
-source:getTopTagged(prefix) -- optional element; no result-array allocation
-source:bindToSocket(name, function(socketOrNil) end, runInitially)
-source:bindTopTaggedChanged(prefix, function(elementOrNil) end, runInitially)
-source:bindSocketChanged(function(name, socketOrNil) end, runInitially)
-source:bindTaggedAdded(function(element) end, runInitially)
-source:bindTaggedRemoved(function(element) end)
+export type AnatomySource = {
+	read socketNames: { read [number]: string },
+	read taggedPrefixes: { read [number]: string },
+	read getSocket: (self: AnatomySource, socketName: string) -> (number?, AnatomySource?),
+	read getTopTagged: (self: AnatomySource, prefix: string) -> (number?, AnatomySource?),
+	read getTagged: (
+		self: AnatomySource,
+		prefix: string,
+		intoElementIndexes: { number },
+		intoAnatomyInstances: { AnatomySource }
+	) -> (),
+	read onAnySocketChanged: (self: AnatomySource, callback: (socketName: string) -> ()) -> () -> (),
+	read onAnyTopTaggedChanged: (self: AnatomySource, callback: (prefix: string) -> ()) -> () -> (),
+	read containsSource: (self: AnatomySource, anatomySource: AnatomySource) -> boolean,
+}
 ```
 
-Each binding returns a disconnect function. Source-wide socket events include names; source tag
-events cover all elements. Initial delivery is synchronous. Source-wide events enumerate existing membership; named socket and
-top-tag subscriptions deliver exactly one initial value, including nil.
-An instance's membership is fixed; a host's membership follows its registered sources.
-Providers must publish complete initial membership, emit actual changes, and release listeners on
-disconnect. Subscription methods that throw must clean up any listener they installed.
-Custom providers must not hide feedback cycles behind adapters; package hosts reject cycles
-through their directly registered host graph. Remove sources from parents before final teardown.
+- `getSocket` and `getTopTagged` return an element index and the instance that supplies it, or
+  `nil, nil`. The instance is always one `anatomyInstance.new` built, never a host.
+- An instance's top element under a prefix is its last one in element-index order.
+- `getTagged` appends an element index to `intoElementIndexes` and its instance, at the same
+  position, to `intoAnatomyInstances`: lowest precedence first, each instance's elements in
+  element-index order. The last pair is what `getTopTagged` returns. It does not empty the arrays.
+- `socketNames` and `taggedPrefixes` list what the source can supply; every other name gives nil.
+  An instance lists exactly what its template has. A host lists every name a source of it has
+  supplied since it was built, so a listed name can currently have no supplier.
+- `onAnySocketChanged` and `onAnyTopTaggedChanged` are how a host hears a host pushed into it. An
+  instance never changes: it keeps nothing and returns a function that does nothing.
+- `containsSource` is true for the source itself and for every source reachable from it through
+  pushed sources.
 
-## AnatomyHost
-
-`anatomyHost.new({ socketNameGuard, tagGuard })` infers both vocabulary types from guards.
-It implements AnatomySource and adds:
+## AnatomyInstance
 
 ```luau
-host:push(source, priority?) -- one registration per source identity; no result handle
-host:remove(source) -- boolean; idempotent
-host:setPriority(source, priority) -- registered sources only
-host:clear()
-host:mount(fromAttachment, toAttachment, options?)
-host:deconstruct()
+export type AnatomyInstance = AnatomySource
 ```
 
-Registrations strongly retain borrowed sources. Higher priority wins; later insertion wins ties.
-A child host contributes its resolved output as a group. Tag union membership is deduplicated by
-element identity, independent of priority. Arrays are ordered from lowest to highest precedence;
-shared elements occur once at their highest-precedence position. A host first ranks its immediate
-sources by priority and insertion order, then uses each source's own ordering. Child priorities are
-local to that child, not flattened into parent priorities. `getTopTagged` agrees with the last result.
-Instances use recognition order; their top match is the last match. Custom sources must preserve this
-agreement and publish top-tag changes for membership or ordering changes, even without add/remove events.
-No layer IDs, layer objects, selector records, override modes, or name-list methods are public.
+`anatomyInstance.new(anatomyTemplate)` returns one frozen table that refers to the template's four
+tables and takes nothing about the clone. Two instances of one template answer every query with the
+same element indexes and differ only in being two tables. It has no setter and no teardown.
 
-## AnatomyTemplate and AnatomyInstance
+## AnatomyHost and AnatomyHostOwned
 
-`anatomyTemplate.new(asset, options)` recognizes authored attributes and captures immutable descriptors.
-Options require typed identity-preserving `socketNameGuard` and `tagGuard`, each `(unknown) -> T`.
-Optional fields: `socketAttribute`, `tagsAttribute`, `tagDelimiter`, `tagPathDelimiter`,
-`category`, `metadata`, and `instancePolicy`. No template ID is accepted.
-`RecognizeOptions` describes those options. The redundant `RecognizeConfig` alias has been removed.
+`anatomyHost.new()` returns `AnatomyHostOwned`. The owner hands a consumer the same object as
+`AnatomyHost`.
 
-Templates expose `getSource`, `getCategory`, `getMetadata`, `instantiate(parent?)`, and `wrap(root)`.
-The source Roblox Instance remains caller-owned. Construction options and policy are snapshotted;
-metadata receives a shallow frozen snapshot, with arbitrary nested values retaining their existing ownership.
-Descriptors and the reused instance-construction record are internal and frozen.
+```luau
+export type AnatomyHost = AnatomySource & {
+	read onSocketChanged: (self, socketName: string, callback, initially: boolean?) -> () -> (),
+	read onTopTaggedChanged: (self, prefix: string, callback, initially: boolean?) -> () -> (),
+	read onSocketAmongOthersChanged: (
+		self, socketName: string, excluded: AnatomySource, callback, initially: boolean?
+	) -> () -> (),
+}
+-- callback: (elementIndex: number?, anatomyInstance: AnatomySource?) -> ()
 
-Instances implement AnatomySource and expose root/template/category/metadata access, `setParent`,
-`applyInstancePolicy`, and `deconstruct`. An instantiated root is owned; a wrapped root is borrowed.
-There is no live attribute scan after recognition and no tag/socket mutation API on instances.
+export type AnatomyHostOwned = AnatomyHost & {
+	read push: (self, anatomySource: AnatomySource, priority: number) -> (),
+	read remove: (self, anatomySource: AnatomySource) -> (),
+	read setPriority: (self, anatomySource: AnatomySource, priority: number) -> (),
+	read deconstruct: (self) -> (),
+}
+```
 
-## AnatomySocket and AnatomyTaggedElement
+**Precedence.** A higher priority is above a lower one. Among equal priorities the later `push` is
+above, and `setPriority` counts as a push for this. A host pushed into a host is one source there:
+its own winner competes at the priority the parent gave it.
 
-Sockets are borrowed concrete objects with `getName`, `getAttachment`, `getPath`, and `getMetadata`.
-`getAttachment` returns Attachment and rejects access after retirement. Sockets have no change event.
+**The owner's methods.**
 
-A tagged element exposes `getInstance`, `getTags`, `hasTag`, and `getLeafUnder`.
-`getTags` returns shared frozen membership through a read-only dictionary type, not a clone. `hasTag` supports ancestor prefixes.
-Retired elements report no tag membership; their engine-instance access must not be used.
-Only their owning anatomy instance holds child teardown authority.
+- `push` raises, before anything changes, when the source is already pushed to this host, or when
+  `anatomySource:containsSource(self)` is true: the source is this host or contains it.
+- `remove` does nothing when the source is not pushed to this host.
+- `setPriority` raises when the source is not pushed to this host. An unchanged priority does
+  nothing.
+- `deconstruct` removes every source, tells every subscriber and every host this one is pushed to
+  nil once per name, then drops every subscriber. Afterwards the queries return nil and append
+  nothing, `push` and the subscriptions raise, and a release obtained earlier still works. A
+  deconstructed host that is still pushed in another host answers nil there until that host removes
+  it.
 
-## Direct observation and SocketMount
+**The subscriptions.**
 
-There is no watcher constructor, type or lifetime. `bindToSocket` uses one callback bucket per observed
-name; `bindTopTaggedChanged` shares a selection and nested subscriptions per observed prefix. Both
-release their bucket/state on the last disconnect and reject subscribing to a destroyed host.
-Initial nil is observable. Changes notify only when the selected identity differs, including fallback
-and final removal. Host teardown removes membership before destroying its owned mounts.
-Static instances have no listener storage: their membership remains fixed until owner teardown.
+- Each calls `callback` with the getter's two results each time they differ from what the host last
+  reported for that name. With `initially`, the callback is added and then called once with the
+  current results before the call returns. Each returns the function that unsubscribes.
+- `onSocketAmongOthersChanged` reports the socket as the highest-precedence source of this host
+  other than `excluded` supplies it. `excluded` is compared with the sources pushed directly to this
+  host; a source that is not pushed to it excludes nothing, and that is not an error. There is no
+  getter beside it: `initially` gives the current result.
+- One function subscribed twice is two entries, each removed by its own release. A release called
+  twice does nothing the second time. A subscriber released during a report, before its turn, is not
+  called; one added during a report waits for the next.
 
-`socketMount.new(from: Attachment?, to: Attachment?, options?)` owns one RigidConstraint.
-Its public methods are `getName`, `getFromAttachment`, `getToAttachment`, `getConstraint`,
-`isConnected`, `setAttachments`, `setEnabled`, `setParent`, and `deconstruct`.
-Mount options contain `name?`, `rigidName?`, `parent?`, `enabled?`.
-Omitted parent is nil, missing attachments disable the constraint, and attachment updates preserve
-requested enabled state and explicit parenting. `isConnected` does not test engine ancestry or physics.
-External owners control subscription wiring and visual-parenting policy.
+**A callback that changes the composition** may do so. Its `push`, `remove` or `setPriority` runs to
+its end, reports included, inside the callback. Every subscriber's last call carries the current
+results; a subscriber may be called twice with the same ones.
 
-See [direct-subscription migration details](./direct-subscriptions-review-2026-10-04.md).
+**A callback that raises** makes the `push`, `remove` or `setPriority` raise with it. Every query on
+the host is already correct. The names the operation had not yet reported are reported at the next
+operation or nested report that involves them. For the name being reported when it raised, the
+subscribers after the raising one are called when that name's winner next changes.

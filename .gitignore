@@ -1,9 +1,4 @@
-*.rbxm
-*.rbxmx
-*.rbxlx
 *.tar.gz
-sourcemap.json
-dev-sourcemap.json
 .pesde/
 roblox_packages/
 luau_packages/
@@ -12,4 +7,3 @@ node_modules/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 .verification/
-scripts/luau-lsp/globalTypes.d.luau

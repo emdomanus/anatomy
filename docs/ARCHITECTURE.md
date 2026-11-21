@@ -1,101 +1,121 @@
 # Architecture
 
-Anatomy owns visual asset recognition, concrete socket/tagged-element identity, composition,
-and explicit attachment constraints. Game-specific policy and rendering ownership remain in consumers.
+Anatomy owns two things: reading socket names and tags from an element table, and composing sources
+by priority. It owns no asset, no clone and no engine object, and it is plain Luau.
 
-## Asset and runtime ownership
+## The records
 
-`anatomyTemplate.new(asset, options)` scans the root and one descendant array, builds paths,
-and freezes the descriptors it owns. Paths are reversed in place. The template retains one frozen
-construction record reused by `instantiate` and `wrap`; descriptor shapes are not a public input.
-An instantiated model is cloned and owned; a wrapped model is borrowed. Both resolve the captured
-paths into concrete sockets and tagged elements. Attributes are not watched after recognition.
+```luau
+AnatomyElement = { authoredAttributes: { [string]: unknown } }     -- declared here, supplied by the asset's owner
 
-Tags are immutable per-element membership. `getTags` returns the frozen set directly, shared across
-instances of the template. Retired elements return a shared frozen empty set. Collection queries
-return independent arrays and never expose mutable internal registries.
+AnatomyTemplate = {                                -- one per element table; frozen
+	socketNames: { string },
+	socketElementIndexByName: { [string]: number },
+	taggedPrefixes: { string },
+	taggedElementIndexesByPrefix: { [string]: { number } },
+}
+AnatomyInstance = {                                -- one per clone; frozen
+	socketNames, taggedPrefixes,                   -- its template's tables
+	_socketElementIndexByName, _taggedElementIndexesByPrefix,
+}
+AnatomyHost = {
+	_anatomySources: { AnatomySource },            -- lowest precedence first
+	_priorities: { number },                       -- parallel to _anatomySources
+	_releaseAnySocketChanged, _releaseAnyTopTaggedChanged,     -- parallel: this host's subscriptions on each source
+	socketNames, taggedPrefixes,                   -- every name a source has supplied; only grow
+	_winnerElementIndexes, _winnerInstances,       -- socket name -> getSocket's two results
+	_topTaggedElementIndexes, _topTaggedInstances, -- prefix -> getTopTagged's two results
+	_reportedWinnerInstances, _reportedTopTaggedInstances,     -- the instance last reported per name
+	_anySocketChangedList, _anyTopTaggedChangedList,           -- the hosts this one is pushed to
+	_socketChangedLists, _topTaggedChangedLists, _socketAmongOthersLists,   -- per name
+}
+```
 
-## AnatomySource composition
+`src/components/` holds the three modules, `src/types/components/` their contracts, and
+`src/types/def/anatomy/` the two contracts no single object implements: `anatomyElement`, the shape a
+provider supplies, and `anatomySource`, the capability the instance and the host both implement.
 
-Instances and hosts directly satisfy the source port: socket lookup, prefix-tag query, source-wide
-socket changes, tag additions/removals, and direct named socket/top-tag subscriptions. Synchronous initial subscription delivery supplies
-actual membership without public enumeration methods. Static instances have no change-listener
-storage; their owner must detach them from all parents before destruction.
+## Why an instance holds nothing about its clone
 
-A host registers sources by table identity. Registrations are private records containing priority,
-registration order, cached socket/tag contributions, and three disconnect functions. The source
-key is retained strongly. There are no public layer objects, registration IDs, override switches,
-or allocated source wrappers. A source can occur only once within one host and in multiple hosts.
+An element index numbers the elements of an asset and the engine objects of each of its clones
+alike, so `(elementIndex, anatomyInstance)` identifies one object of one clone. The asset's owner
+already has the object at each index, and a consumer that writes a property should write it through
+that owner so the write can be restored. So Anatomy returns the pair and the consumer resolves it.
+An instance is then only the identity of a clone: one frozen table per clone, built without reading
+anything.
 
-Highest priority supplies the resolved socket; later registration wins ties. Nested hosts resolve
-internally, then contribute their result at the parent's priority. An identity-only weak host graph
-borrows each host's existing source array to reject direct and indirect cycles without adding a
-second child collection or widening the public port. Custom providers must not hide cyclic composition.
+The template's four tables are on its public type. `anatomyInstance.new` is another object and reads
+only the template's public contract, and with the fields declared the type checker rejects a table
+that is not a template.
 
-## Incremental updates
+## Composition
 
-Initial source subscription stages and validates membership before installing the registration.
-Failure releases all acquired subscriptions and publishes no partial registration. No per-socket
-entry object is allocated: each registration stores a name-to-socket map.
+A host keeps everything about a push in its own arrays. A source holds nothing about the hosts it is
+in, except that a host keeps the functions its parents subscribed.
 
-A child socket event updates its cached contribution and resolves that name against ordered
-registrations only. Insertion, removal, and reprioritization reconsider only names supplied by
-that registration. The host publishes a socket change only when its selected identity changes.
-No collection of every socket name or full-prefix refresh is performed.
+`push`, `remove` and `setPriority` work in two passes over the socket names and prefixes of the
+source they moved:
 
-Tag changes update an element-identity reference count. The first contribution emits added;
-the last contribution emits removed. Shared leaves through multiple child hosts are deduplicated.
-Host `getTagged(prefix)` queries sources in precedence order and returns an independent, ordered,
-identity-deduplicated array. Shared elements occupy their highest-precedence occurrence. Child ordering
-remains local to each child; parent priority ranks child groups. `getTopTagged` returns the last match
-from the highest-ranked nonempty source without constructing arrays.
+1. For each name, scan `_anatomySources` from the top and write the winner. After this pass every
+   query on the host is correct.
+2. For each name, when the winner differs from `_reportedWinnerInstances[name]`: record it, fire
+   `_anySocketChangedList` with the name, and fire `_socketChangedLists[name]` with the two results.
+   Then fire `_socketAmongOthersLists[name]`, changed or not.
 
-Top-tag selection caches exist only for observed prefixes. The first listener subscribes to that prefix
-on child sources; later listeners share the cache and subscriptions. Membership/priority mutations
-reconcile affected observed prefixes, and nested priority-only changes propagate through the same
-prefix stream. Identity equality suppresses redundant callbacks. Last disconnect releases the child
-subscriptions and cache. Unobserved getters scan on demand; observed getters return the cache.
-There is no eager index or retained candidate list for every possible tag prefix.
+A host pushed into a host is a source like an instance. At `push` the parent calls the source's
+`onAnySocketChanged` and `onAnyTopTaggedChanged` with two functions it created once, in `new`. An
+instance returns a function that does nothing; a host adds the function to its list. When the child
+fires it with a name, the parent runs both passes for that one name, reading the child's `getSocket`,
+and reports only if its own winner changed. So when one push into a child changes several names, the
+parent learns them one at a time.
 
-Mutation commits registration/tag state before notification. Publication checks the current state
-between callbacks so reentrant removal or replacement does not continue emitting stale selections.
-Removal detaches subscriptions before reconciling output. `clear` snapshots source identities so
-new registrations created by callbacks are not accidentally swept into the same clear operation.
+A cycle is refused at `push`, the only call that adds a source: `push` calls
+`anatomySource:containsSource(self)` and raises when it is true.
 
-## Direct subscriptions, mounts, and teardown
+`deconstruct` empties the source arrays first and then runs both passes over every name the host has
+listed, so each name is reported as nil once, without the lower sources being reported on the way.
 
-`bindToSocket(name, callback, runInitially)` registers directly in a shared per-name callback bucket.
-The host retains the source-wide socket stream for composition; consumers need no forwarding object.
-An AnatomySocket always has an Attachment until retired. SocketMount owns one reusable RigidConstraint
-with explicit attachments, enabled intent, and parent. Rendering owners bind externally and update it.
+## Reports and reentrancy
 
-Remove static/custom sources from their parents before final teardown. Host teardown publishes source
-removals and nil/fallback selections before destroying owned mounts, then clears subscriptions. It never
-destroys borrowed sources. Release mount-update callbacks before manually destroying a mount. A static
-instance's subscription returns a no-op release because its membership cannot change while alive.
+Subscribers are held in `luauUtils`' `callbackList`, which calls them in the order they were added
+and holds no state about a fire in progress. The host holds none either.
 
-## Allocation tradeoff
+- A callback may change the composition. The nested operation reports the newer winner to every
+  subscriber of the name; the outer fire then still calls its remaining subscribers with the older
+  one. After a fire returns, the host compares the winner with the instance it fired and fires again
+  while they differ.
+- `_reportedWinnerInstances[name]` is written before the fire, not after. Written after, an
+  operation a subscriber ran inside its own call, visiting the same name, would find the name
+  unreported and fire it again to that subscriber.
+- That choice sets what a raising callback leaves: the names the second pass had not reached still
+  differ from what was reported, so the next operation that visits them reports them; the name being
+  fired is already recorded, so its remaining subscribers are called when its winner next changes.
 
-The previous recognition/instance improvements are preserved. Frozen tags remove per-read cloning.
-Source registration now retains one record and two contribution maps, plus disconnect closures;
-this retained state allows incremental updates and nesting. There is no options table at push.
-Push/remove currently use a temporary tag-notification list to finish membership changes before
-calling observers. Priority changes and individual source socket/tag events allocate no explicit
-Luau tables in Anatomy. Consumer callbacks, closures, engine allocations, and array capacity growth
-are separate costs; this is source accounting, not a profiler claim.
+An `onSocketAmongOthersChanged` subscriber is one entry in `_socketAmongOthersLists[socketName]`. The
+winner among the other sources can change while the overall winner does not, so the entry is called
+for every name an operation visits; it scans the sources from the top, skips `excluded`, and calls
+the subscriber when the instance differs from the one it last reported.
 
-A named socket bucket costs one table per observed name, shared by all listeners, instead of two
-watcher tables per consumer. A top-tag observation costs three tables per host/prefix (selection,
-callbacks, child releases), shared by all listeners; subscribing through nested hosts activates the
-same prefix there. Each host has two empty maps holding these lazy entries. Last release removes an
-entry. Discrete top-tag queries allocate no explicit tables. Bulk queries still allocate result arrays,
-a deduplication set per host query, and source query arrays; they are not allocation-free.
+## Allocation
+
+| Call | Allocates |
+| --- | --- |
+| `anatomyTemplate.new` | the template, 2 arrays, 2 maps, 1 array per prefix, the prefix strings, and `string.split`'s arrays while it reads |
+| `anatomyInstance.new` | 1 table |
+| `anatomyHost.new` | 18 tables and 2 functions; the two `any…` lists are created when the host is first pushed into a host |
+| `getSocket`, `getTopTagged`, `getTagged`, `containsSource` | nothing; `getTagged` grows the arrays it is given |
+| `push`, `remove`, `setPriority` of an instance, and every report | nothing; the host's arrays grow when it holds more sources, or sees more names, than it ever has |
+| `push` of a host | 2 closures, `callbackList`'s releases |
+| `onSocketChanged`, `onTopTaggedChanged` | 1 closure, `callbackList`'s release; the name's `CallbackList` (3 tables) for its first subscriber |
+| `onSocketAmongOthersChanged` | 2 closures, the entry and its release; the name's `CallbackList` for its first such subscriber |
+
+A subscriber list is kept until `deconstruct`: the last subscriber leaving does not remove it.
+`tests/src/components/anatomyHost/anatomyHost.spec.luau` measures the queries and the changes of an
+instance at 0 bytes.
 
 ## Verification
 
-The guarded runner covers formatting, lint, full new-solver analysis, behavioral tests, package/dev
-Rojo builds, and docs. Source tests exercise real instance/host callers for constructor inference,
-frozen tags, duplicate-name paths, identity registration, priority ties, nested propagation, cycles,
-shared tag contributions, rollback, reentrant removal, borrowed lifetime, and incremental event scope.
-The existing explicit-mount contract tests remain. The Studio demo and six behavioral groups use
-the new API. Headless constraints are simulated property sinks; Studio verification is pending.
+`compass checks run -ProjectRoot . -Kind code` runs the `luau` preset's checks and
+`scripts/verify/tests.ps1`. The analysis loads no engine definitions, so an engine type or global
+written in `src` is a diagnostic. The suites build element tables as Luau literals and run in Lune.
+Nothing in the package needs Studio.

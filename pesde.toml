@@ -1,9 +1,10 @@
 name = "emdomanus/anatomy"
-version = "0.2.0"
-description = "Renderable anatomy, socket, tag, and mounting primitives for Roblox."
+version = "0.3.0"
+description = "Named sockets and hierarchical tags read from an asset's element table, composed across sources by priority. Plain Luau: no engine API."
 license = "MIT"
 authors = ["emdomanus"]
 repository = "https://github.com/emdomanus/anatomy"
+private = true
 
 includes = [
 	"pesde.toml",
@@ -14,12 +15,11 @@ includes = [
 ]
 
 [target]
-environment = "roblox"
-lib = "src/init.luau"
-build_files = ["src"]
+environment = "luau"
+lib = "src/shared.luau"
 
 [indices]
 default = "https://github.com/pesde-pkg/index"
 
 [dependencies]
-guard = { repo = "emdomanus/guard", rev = "6d6eab5c06e5b0e68408e9bd6ef1a985cc16806f" }
+luauUtils = { repo = "emdomanus/luauUtils", rev = "51f60518efde736b5497c0cbd2121c0ea4c517f7" }
