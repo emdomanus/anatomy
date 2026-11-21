@@ -1,0 +1,17 @@
+{
+  "extends": "luau",
+  "tracker": { "kind": "youtrack", "project": "VMMO", "url": "https://voxelmmo.youtrack.cloud" },
+  "setup": ["pesde install --locked"],
+  "settings": {
+    "analyzePaths": ["src", "tests/**/*.typecheck.luau", "tests/**/*.typeError.luau"]
+  },
+  "checks": {
+    "tests": { "run": "scripts/verify/tests.ps1" },
+    "docs": { "run": "npm run docs:build" }
+  },
+  "kinds": {
+    "code": { "checks": ["tests"] },
+    "docs": { "checks": ["docs"], "integration": "pr" }
+  },
+  "pr": { "checks": ["tests"] }
+}

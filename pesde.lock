@@ -2,14 +2,14 @@
 # It is not intended for manual editing.
 format = 2
 name = "emdomanus/anatomy"
-version = "0.2.0"
-target = "roblox"
+version = "0.3.0"
+target = "luau"
 
-[graph."emdomanus/guard@0.0.0-68fd055678825ae339ff2ecada278f86cbf50ef8 roblox"]
-direct = ["guard", { repo = "https://github.com/emdomanus/guard", rev = "6d6eab5c06e5b0e68408e9bd6ef1a985cc16806f" }, "standard"]
+[graph."emdomanus/luau_utils@0.0.0-47c4c469f2a0489e10fc7ea067041603f02a4055 luau"]
+direct = ["luauUtils", { repo = "https://github.com/emdomanus/luauUtils", rev = "51f60518efde736b5497c0cbd2121c0ea4c517f7" }, "standard"]
 
-[graph."emdomanus/guard@0.0.0-68fd055678825ae339ff2ecada278f86cbf50ef8 roblox".pkg_ref]
+[graph."emdomanus/luau_utils@0.0.0-47c4c469f2a0489e10fc7ea067041603f02a4055 luau".pkg_ref]
 ref_ty = "git"
-repo = "https://github.com/emdomanus/guard"
-tree_id = "68fd055678825ae339ff2ecada278f86cbf50ef8"
+repo = "https://github.com/emdomanus/luauUtils"
+tree_id = "47c4c469f2a0489e10fc7ea067041603f02a4055"
 new_structure = true

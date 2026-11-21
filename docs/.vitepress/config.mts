@@ -3,7 +3,7 @@ import { defineConfig } from "vitepress";
 export default defineConfig({
 	base: process.env.DOCS_BASE ?? "/",
 	title: "Anatomy",
-	description: "Renderable anatomy, socket, tag, and mounting primitives for Roblox.",
+	description: "Named sockets and hierarchical tags read from an element table, composed by priority. Plain Luau.",
 	cleanUrls: true,
 	themeConfig: {
 		nav: [
@@ -19,6 +19,11 @@ export default defineConfig({
 					{ text: "Types", link: "/types" },
 					{ text: "Architecture", link: "/ARCHITECTURE" },
 				],
+			},
+			{
+				text: "TODO",
+				collapsed: true,
+				items: [{ text: "API proposal (VMMO-92)", link: "/todo/vmmo92/apiProposal" }],
 			},
 		],
 		search: {

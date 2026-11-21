@@ -1,36 +1,36 @@
 # Anatomy
 
-Anatomy recognizes Roblox assets into concrete sockets and tagged elements, composes instances
-and nested hosts through `AnatomySource`, and provides explicit attachment mounts.
+Anatomy reads named sockets and hierarchical tags from an asset's element table and composes them
+across sources by priority. It is plain Luau: it reads no model, holds no engine object and calls no
+engine API.
 
 ```luau
-local Anatomy = require(game.ReplicatedStorage.packages.anatomy)
-local function guardName(value: unknown): string
-    assert(type(value) == "string", "Expected a name")
-    return value
-end
-local template = Anatomy.anatomyTemplate.new(asset, {
-    socketNameGuard = guardName,
-    tagGuard = guardName,
-    socketAttribute = "Socket",
-    tagsAttribute = "Tags",
-})
-local instance = template:instantiate(workspace)
-local host = Anatomy.anatomyHost.new({ socketNameGuard = guardName, tagGuard = guardName })
-host:push(instance, 10)
-local socket = host:getSocket("rightGrip")
-local effects = host:getTagged("effect")
-local topEffect = host:getTopTagged("effect")
-host:remove(instance)
-host:deconstruct()
-instance:deconstruct()
+local Anatomy = require(path.to.anatomy)
+
+local anatomyTemplate = Anatomy.anatomyTemplate.new(elements, "RigSocket", "RigSurface")
+local anatomyInstance = Anatomy.anatomyInstance.new(anatomyTemplate)
+local anatomyHost = Anatomy.anatomyHost.new()
+
+anatomyHost:push(anatomyInstance, 10)
+local elementIndex, supplier = anatomyHost:getSocket("body.head")
+local topElementIndex, topSupplier = anatomyHost:getTopTagged("skin")
+anatomyHost:remove(anatomyInstance)
+anatomyHost:deconstruct()
 ```
 
-- [Public contracts](./types.md)
-- [Architecture and ownership](./ARCHITECTURE.md)
-- [Direct subscriptions and ordered tags](./direct-subscriptions-review-2026-10-04.md)
-- [Source-model migration receipt](./source-model-review-2026-10-03.md)
+The three things it builds:
 
-Anatomy owns recognition, composition, and mounting primitives. It does not own gameplay,
-replication, visual parenting, or effect lifetime. The package entrypoint selects exact shared
-contract leaves; public descriptor construction and string layer identities are absent.
+| Object | One per | Is |
+| --- | --- | --- |
+| `AnatomyTemplate` | element table | frozen data: socket names and tag prefixes, each with element indexes |
+| `AnatomyInstance` | clone of the asset | the identity of one clone; holds nothing about the clone |
+| `AnatomyHost` | composed thing | the sources pushed to it, by priority, and the winner of every name |
+
+Every query returns an element index with the instance that supplied it. The consumer keeps the map
+from an instance to its clone and asks the asset's owner for the engine object at that index.
+
+- [Public contracts](./types.md)
+- [Architecture](./ARCHITECTURE.md)
+
+Anatomy owns the reading of names from an element table and the composition of sources. It does not
+own the asset, its clones, any engine object, or a constraint between two of them.
