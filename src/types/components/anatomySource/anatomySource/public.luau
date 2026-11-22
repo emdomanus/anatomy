@@ -1,12 +1,11 @@
 --!strict
 --!optimize 2
--- What a host composes. Two objects implement it, the anatomyInstance and the anatomyHost, so it has
--- no single implementer to belong to and is a def leaf.
+-- What a host composes and `push` takes. Two objects implement it, the anatomyInstance and the
+-- anatomyHost, so it is a contract of its own: a folder holding only this leaf, with no module.
 --
 -- A socket and a tagged element are each an element index with "the instance": the AnatomySource
--- that `anatomyInstance.new` built and whose template holds that index. It is never a host. A def
--- leaf cannot name AnatomyInstance, which is declared above it, so these signatures say
--- AnatomySource.
+-- that `anatomyInstance.new` built and whose template holds that index. It is never a host. These
+-- signatures name it AnatomySource: AnatomyInstance is declared in a leaf that requires this one.
 export type AnatomySource = {
 	-- `getSocket` returns nil for every name not listed, and `getTopTagged` for every prefix not
 	-- listed. An instance lists exactly what its template has. A host lists every name a source of

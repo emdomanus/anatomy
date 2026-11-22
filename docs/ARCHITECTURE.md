@@ -31,9 +31,10 @@ AnatomyHost = {
 }
 ```
 
-`src/components/` holds the three modules, `src/types/components/` their contracts, and
-`src/types/def/anatomy/` the two contracts no single object implements: `anatomyElement`, the shape a
-provider supplies, and `anatomySource`, the capability the instance and the host both implement.
+`src/components/` holds the three modules and `src/types/components/` their contracts, and one
+contract with no module: `anatomySource`, the capability the instance and the host both implement.
+`AnatomyElement`, the shape a provider supplies, is in anatomyTemplate's contract, because
+`anatomyTemplate.new` reads it.
 
 ## Why an instance holds nothing about its clone
 

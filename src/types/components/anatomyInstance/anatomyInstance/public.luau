@@ -1,6 +1,6 @@
 --!strict
 --!optimize 2
-local AnatomySourceTypes = require("../../../def/anatomy/anatomySource/public")
+local AnatomySourceTypes = require("../../anatomySource/anatomySource/public")
 
 -- One clone's identity inside Anatomy. It is the capability and nothing more: no setter, no
 -- subscription that ever fires and no teardown. Two instances of one template answer every query

@@ -20,7 +20,7 @@
 local LuauUtils = require("../../../luau_packages/luauUtils")
 local AnatomyHostPrivateTypes = require("../../types/components/anatomyHost/anatomyHost/private")
 local AnatomyHostTypes = require("../../types/components/anatomyHost/anatomyHost/public")
-local AnatomySourceTypes = require("../../types/def/anatomy/anatomySource/public")
+local AnatomySourceTypes = require("../../types/components/anatomySource/anatomySource/public")
 
 type AnatomyHostImpl = AnatomyHostPrivateTypes.AnatomyHostImpl
 type AnatomyHostOwned = AnatomyHostTypes.AnatomyHostOwned

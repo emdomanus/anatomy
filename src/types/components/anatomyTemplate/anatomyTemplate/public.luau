@@ -1,5 +1,12 @@
 --!strict
 --!optimize 2
+-- One element of an asset, as the asset's owner indexes it: `anatomyTemplate.new` reads an array
+-- of these, `elements[elementIndex]`. Anatomy declares this shape and whoever owns the asset
+-- supplies it. Anatomy reads this one field and nothing else about an element.
+export type AnatomyElement = {
+	read authoredAttributes: { read [string]: unknown },
+}
+
 -- The sockets and tagged elements of one element table: frozen data, built once by
 -- `anatomyTemplate.new` and shared by every instance of it. It has no method and no private part.
 -- `anatomyInstance.new` reads these four tables, and a consumer may read them too, for example to

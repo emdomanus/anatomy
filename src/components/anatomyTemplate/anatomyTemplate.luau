@@ -5,9 +5,8 @@
 -- element-index order, once, and returns frozen data. It reads no model and calls no engine.
 local AnatomyTemplateTypes =
 	require("../../types/components/anatomyTemplate/anatomyTemplate/public")
-local AnatomyElementTypes = require("../../types/def/anatomy/anatomyElement/public")
 
-type AnatomyElement = AnatomyElementTypes.AnatomyElement
+type AnatomyElement = AnatomyTemplateTypes.AnatomyElement
 type AnatomyTemplate = AnatomyTemplateTypes.AnatomyTemplate
 export type AnatomyTemplateModule = {
 	-- An element whose `socketAttribute` attribute is set is a socket named by that string; a name

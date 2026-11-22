@@ -7,11 +7,10 @@ local AnatomyInstance = require("./components/anatomyInstance/anatomyInstance")
 local AnatomyTemplate = require("./components/anatomyTemplate/anatomyTemplate")
 local AnatomyHostTypes = require("./types/components/anatomyHost/anatomyHost/public")
 local AnatomyInstanceTypes = require("./types/components/anatomyInstance/anatomyInstance/public")
+local AnatomySourceTypes = require("./types/components/anatomySource/anatomySource/public")
 local AnatomyTemplateTypes = require("./types/components/anatomyTemplate/anatomyTemplate/public")
-local AnatomyElementTypes = require("./types/def/anatomy/anatomyElement/public")
-local AnatomySourceTypes = require("./types/def/anatomy/anatomySource/public")
 
-export type AnatomyElement = AnatomyElementTypes.AnatomyElement
+export type AnatomyElement = AnatomyTemplateTypes.AnatomyElement
 export type AnatomySource = AnatomySourceTypes.AnatomySource
 export type AnatomyTemplate = AnatomyTemplateTypes.AnatomyTemplate
 export type AnatomyInstance = AnatomyInstanceTypes.AnatomyInstance

@@ -8,9 +8,9 @@ local AnatomyInstancePrivateTypes =
 	require("../../types/components/anatomyInstance/anatomyInstance/private")
 local AnatomyInstanceTypes =
 	require("../../types/components/anatomyInstance/anatomyInstance/public")
+local AnatomySourceTypes = require("../../types/components/anatomySource/anatomySource/public")
 local AnatomyTemplateTypes =
 	require("../../types/components/anatomyTemplate/anatomyTemplate/public")
-local AnatomySourceTypes = require("../../types/def/anatomy/anatomySource/public")
 
 type AnatomyInstance = AnatomyInstanceTypes.AnatomyInstance
 type AnatomyInstanceImpl = AnatomyInstancePrivateTypes.AnatomyInstanceImpl

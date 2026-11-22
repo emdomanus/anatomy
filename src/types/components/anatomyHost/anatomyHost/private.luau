@@ -1,7 +1,7 @@
 --!strict
 --!optimize 2
 local LuauUtils = require("../../../../../luau_packages/luauUtils")
-local AnatomySourceTypes = require("../../../def/anatomy/anatomySource/public")
+local AnatomySourceTypes = require("../../anatomySource/anatomySource/public")
 local AnatomyHostTypes = require("./public")
 
 type AnatomyHostOwned = AnatomyHostTypes.AnatomyHostOwned

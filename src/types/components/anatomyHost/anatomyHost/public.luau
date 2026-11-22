@@ -1,6 +1,6 @@
 --!strict
 --!optimize 2
-local AnatomySourceTypes = require("../../../def/anatomy/anatomySource/public")
+local AnatomySourceTypes = require("../../anatomySource/anatomySource/public")
 
 type AnatomySource = AnatomySourceTypes.AnatomySource
 
